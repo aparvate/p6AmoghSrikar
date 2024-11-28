@@ -26,23 +26,27 @@ int main(int argc, char *argv[]) {
 
     opt = getopt(argc, argv, "r:d:i:b:");
     while (opt != -1) {
-        switch (opt) {
-            case 'r':
+        //switch (opt) {
+            if (opt == 'r') {
                 if (strcmp(optarg, "0") == 0) raid_mode = 0;
                 else if (strcmp(optarg, "1") == 0) raid_mode = 1;
                 else if (strcmp(optarg, "1v") == 0) raid_mode = 2;
                 else return 1;  // Usage error - invalid RAID mode
                 break;
-            case 'd':
+            }
+            if (opt == 'd') {
                 disk_files[num_disks++] = optarg;
                 break;
-            case 'i':
+            }
+            if (opt == 'i') {
                 num_inodes = atoi(optarg);
                 break;
-            case 'b':
+            }
+            if (opt == 'b') {
                 num_blocks = atoi(optarg);
                 break;
-        }
+            }
+        //}
         opt = getopt(argc, argv, "r:d:i:b:");
     }
 
