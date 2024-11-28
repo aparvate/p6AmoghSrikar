@@ -33,15 +33,15 @@ int main(int argc, char *argv[]) {
             else return 1;  // Usage error - invalid RAID mode
             break;
         }
-        else if (opt == 'd') {
+        if (opt == 'd') {
             disk_files[num_disks++] = optarg;
             break;
         }
-        else if (opt == 'i') {
+        if (opt == 'i') {
             num_inodes = atoi(optarg);
             break;
         }
-        else if (opt == 'b') {
+        if (opt == 'b') {
             num_blocks = atoi(optarg);
             break;
         }
