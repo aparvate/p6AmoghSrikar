@@ -27,18 +27,10 @@ int main(int argc, char *argv[]) {
     opt = getopt(argc, argv, "r:d:i:b:");
     while (opt != -1) {
         if (opt == 'r') {
-            if (strcmp(optarg, "0") == 0) {
-                raid_mode = 0;
-            }
-            else if (strcmp(optarg, "1") == 0) {
-                raid_mode = 1;
-            }
-            else if (strcmp(optarg, "1v") == 0) {
-                raid_mode = 2;
-            }
-            else {
-                return 1;
-            }
+            if (strcmp(optarg, "0") == 0) raid_mode = 0;
+            else if (strcmp(optarg, "1") == 0) raid_mode = 1;
+            else if (strcmp(optarg, "1v") == 0) raid_mode = 2;
+            else return 1;  // Usage error - invalid RAID mode
             break;
         }
         else if (opt == 'd') {
