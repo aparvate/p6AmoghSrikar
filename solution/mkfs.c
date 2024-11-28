@@ -39,19 +39,15 @@ int main(int argc, char *argv[]) {
                 else {
                     return -1;
                 }
-                break;
             }
-            if (opt == 'd'){
+            else if (opt == 'd'){
                 disk_files[num_disks++] = optarg;
-                break;
             }
-            if (opt == 'i'){
+            else if (opt == 'i'){
                 num_inodes = atoi(optarg);
-                break;
             }
-            if (opt == 'b'){
+            else if (opt == 'b'){
                 num_blocks = atoi(optarg);
-                break;
             }
         //}
     }
