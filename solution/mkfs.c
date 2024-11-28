@@ -24,7 +24,8 @@ int main(int argc, char *argv[]) {
     char* disk_files[256] = {NULL};
     int num_disks = 0;
 
-    while ((opt = getopt(argc, argv, "r:d:i:b:")) != -1) {
+    opt = getopt(argc, argv, "r:d:i:b:");
+    while (opt != -1) {
         switch (opt) {
             case 'r':
                 if (strcmp(optarg, "0") == 0) raid_mode = 0;
@@ -42,6 +43,7 @@ int main(int argc, char *argv[]) {
                 num_blocks = atoi(optarg);
                 break;
         }
+        opt = getopt(argc, argv, "r:d:i:b:");
     }
 
     if (raid_mode == -1) {
