@@ -36,12 +36,13 @@ int main(int argc, char *argv[]) {
             if (raidCheck == 0 && raid_mode == -1) {
                 raid_mode = 1;
             }
-            
+
             raidCheck = strcmp(optarg, "1v");
             if (raidCheck == 0 && raid_mode == -1) {
                 raid_mode = 2;
             }
-            else {
+
+            if (raid_mode == -1) {
                 return 1;
             }
             break;
