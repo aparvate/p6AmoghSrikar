@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
                     raid_mode = 2;
                 }
                 else {
-                    return -1;
+                    return 1;
                 }
             }
             if (opt == 'd'){
