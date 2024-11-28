@@ -64,7 +64,6 @@ int main(int argc, char *argv[]) {
     size_t inode_bitmap_bytes = (num_inodes + 7) / 8;
 
     //Offsets
-    size_t superblock_size = sizeof(struct wfsSbExtended);
     off_t i_bitmap_off = sizeof(struct wfsSbExtended);
     off_t d_bitmap_off = i_bitmap_off + inode_bitmap_bytes;
     off_t i_start = d_bitmap_off + data_bitmap_bytes;
