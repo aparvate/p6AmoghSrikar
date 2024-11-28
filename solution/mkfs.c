@@ -54,18 +54,9 @@ int main(int argc, char *argv[]) {
         opt = getopt(argc, argv, "r:d:i:b:");
     }
 
-    if (raid_mode == -1) {
-        fprintf(stderr, "Error: No raid mode specified.\n");
-        return 1;  // Usage error - missing required parameter
-    }
-
-    if (num_disks < 2) {
-        fprintf(stderr, "Error: At least 2 disks are required.\n");
-        return 1;  // Usage error - not enough disks
-    }
-
-    if (num_inodes <= 0 || num_blocks <= 0) {
-        return 1;  // Usage error - invalid parameters
+    // Error checking
+    if (raid_mode == -1 || num_disks < 2 || num_inodes <= 0 || num_blocks <= 0) {
+        return 1;
     }
 
     // Round both inodes and blocks to multiples of 32
