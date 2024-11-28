@@ -24,27 +24,23 @@ int main(int argc, char *argv[]) {
     char* disk_files[256] = {NULL};
     int num_disks = 0;
 
-    opt = getopt(argc, argv, "r:d:i:b:");
-    while (opt != -1) {
-        opt = getopt(argc, argv, "r:d:i:b:");
-        if (opt == 'r') {
-            if (strcmp(optarg, "0") == 0) raid_mode = 0;
-            else if (strcmp(optarg, "1") == 0) raid_mode = 1;
-            else if (strcmp(optarg, "1v") == 0) raid_mode = 2;
-            else return 1;  // Usage error - invalid RAID mode
-            break;
-        }
-        if (opt == 'd') {
-            disk_files[num_disks++] = optarg;
-            break;
-        }
-        if (opt == 'i') {
-            num_inodes = atoi(optarg);
-            break;
-        }
-        if (opt == 'b') {
-            num_blocks = atoi(optarg);
-            break;
+    while ((opt = getopt(argc, argv, "r:d:i:b:")) != -1) {
+        switch (opt) {
+            case 'r':
+                if (strcmp(optarg, "0") == 0) raid_mode = 0;
+                else if (strcmp(optarg, "1") == 0) raid_mode = 1;
+                else if (strcmp(optarg, "1v") == 0) raid_mode = 2;
+                else return 1;  // Usage error - invalid RAID mode
+                break;
+            case 'd':
+                disk_files[num_disks++] = optarg;
+                break;
+            case 'i':
+                num_inodes = atoi(optarg);
+                break;
+            case 'b':
+                num_blocks = atoi(optarg);
+                break;
         }
     }
 
