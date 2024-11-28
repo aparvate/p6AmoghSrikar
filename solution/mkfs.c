@@ -96,10 +96,10 @@ int main(int argc, char *argv[]) {
                 munmap(diskMapStore[j], fsSize);
                 close(fds[j]);
             }
-            free(fds);
-            free(diskMapStore);
+            freeFunc(fds, diskMapStore);
             return -1;
         }
+
         struct stat st;
         if (fstat(fds[i], &st) < 0 || st.st_size < fsSize) {
             for (int j = 0; j < i; j++) {
@@ -107,38 +107,28 @@ int main(int argc, char *argv[]) {
                 close(fds[j]);
             }
             close(fds[i]);
-            free(fds);
-            free(diskMapStore);
+            freeFunc(fds, diskMapStore);
             return -1;
         }
+
         diskMapStore[i] = mmap(NULL, fsSize, PROT_READ | PROT_WRITE, MAP_SHARED, fds[i], 0);
-        if (diskMapStore[i] == MAP_FAILED) {
+        if (mmap(NULL, fsSize, PROT_READ | PROT_WRITE, MAP_SHARED, fds[i], 0) == MAP_FAILED) {
             for (int j = 0; j < i; j++) {
                 munmap(diskMapStore[j], fsSize);
                 close(fds[j]);
             }
             close(fds[i]);
-            free(fds);
-            free(diskMapStore);
+            freeFunc(fds, diskMapStore);
             return -1;
         }
 
-        // Zero out the entire disk
+        // Writing
         memset(diskMapStore[i], 0, fsSize);
-
-        // Write superblock
         memcpy(diskMapStore[i], &sb, sizeof(sb));
-
-        // Write inode bitmap
         char* nodeMapSize = (char*)diskMapStore[i] + iOff;
         memset(nodeMapSize, 0, nodeSize);
-        nodeMapSize[0] = 1;  // Mark first inode as used
+        nodeMapSize[0] = 1;
 
-        // Write data bitmap
-        char* dataMapSize = (char*)diskMapStore[i] + dOff;
-        memset(dataMapSize, 0, dataSize);
-
-        // Write root inode
         struct wfs_inode root = {0};
         root.mode = S_IFDIR | 0755;
         root.uid = getuid();
@@ -149,7 +139,6 @@ int main(int argc, char *argv[]) {
         root.ctim = time(NULL);
         memcpy((char*)diskMapStore[i] + iStart, &root, sizeof(root));
 
-        // Sync changes to disk
         msync(diskMapStore[i], fsSize, MS_SYNC);
     }
 
@@ -158,7 +147,11 @@ int main(int argc, char *argv[]) {
         munmap(diskMapStore[i], fsSize);
         close(fds[i]);
     }
+    freeFunc(fds, diskMapStore);
+    return 0;
+}
+
+void freeFunc(int* fds, void** diskMapStore){
     free(fds);
     free(diskMapStore);
-    return 0;  // Success - everything worked
 }
