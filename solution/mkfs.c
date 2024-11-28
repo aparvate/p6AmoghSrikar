@@ -57,17 +57,15 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // Round both inodes and blocks to multiples of 32
-    num_inodes = ((num_inodes + 31) / 32) * 32;;
-    num_blocks = ((num_blocks + 31) / 32) * 32;;
-
-    // Calculate bitmap sizes in bytes
-    size_t inode_bitmap_bytes = (num_inodes + 7) / 8;
+    //Sizes
+    num_blocks = ((num_blocks + 31) / 32) * 32;
+    num_inodes = ((num_inodes + 31) / 32) * 32;
     size_t data_bitmap_bytes = (num_blocks + 7) / 8;
+    size_t inode_bitmap_bytes = (num_inodes + 7) / 8;
 
-    // Calculate offsets
+    //Offsets
     size_t superblock_size = sizeof(struct wfsSbExtended);
-    off_t i_bitmap_off = superblock_size;
+    off_t i_bitmap_off = sizeof(struct wfsSbExtended);
     off_t d_bitmap_off = i_bitmap_off + inode_bitmap_bytes;
     off_t i_start = d_bitmap_off + data_bitmap_bytes;
     
