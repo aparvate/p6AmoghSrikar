@@ -10,15 +10,11 @@
 #include <time.h>
 #include "wfs.h"
 
-struct wfs_sb_ext {
+struct wfsSbExtended {
     struct wfs_sb base;
     int raid_mode;
     int num_disks;
 } __attribute__((packed));
-
-static size_t round_size(size_t num) {
-    return ((num + 31) / 32) * 32;
-}
 
 int main(int argc, char *argv[]) {
     int opt;
@@ -28,23 +24,26 @@ int main(int argc, char *argv[]) {
     char* disk_files[256] = {NULL};
     int num_disks = 0;
 
-    while ((opt = getopt(argc, argv, "r:d:i:b:")) != -1) {
-        switch (opt) {
-            case 'r':
-                if (strcmp(optarg, "0") == 0) raid_mode = 0;
-                else if (strcmp(optarg, "1") == 0) raid_mode = 1;
-                else if (strcmp(optarg, "1v") == 0) raid_mode = 2;
-                else return 1;  // Usage error - invalid RAID mode
-                break;
-            case 'd':
-                disk_files[num_disks++] = optarg;
-                break;
-            case 'i':
-                num_inodes = atoi(optarg);
-                break;
-            case 'b':
-                num_blocks = atoi(optarg);
-                break;
+    opt = getopt(argc, argv, "r:d:i:b:");
+    while (opt != -1) {
+        if (opt == 'r') {
+            if (strcmp(optarg, "0") == 0) raid_mode = 0;
+            else if (strcmp(optarg, "1") == 0) raid_mode = 1;
+            else if (strcmp(optarg, "1v") == 0) raid_mode = 2;
+            else return 1;  // Usage error - invalid RAID mode
+            break;
+        }
+        else if (opt == 'd') {
+            disk_files[num_disks++] = optarg;
+            break;
+        }
+        else if (opt == 'i') {
+            num_inodes = atoi(optarg);
+            break;
+        }
+        else if (opt == 'b') {
+            num_blocks = atoi(optarg);
+            break;
         }
     }
 
@@ -63,15 +62,15 @@ int main(int argc, char *argv[]) {
     }
 
     // Round both inodes and blocks to multiples of 32
-    num_inodes = round_size(num_inodes);
-    num_blocks = round_size(num_blocks);
+    num_inodes = ((num_inodes + 31) / 32) * 32;;
+    num_blocks = ((num_blocks + 31) / 32) * 32;;
 
     // Calculate bitmap sizes in bytes
     size_t inode_bitmap_bytes = (num_inodes + 7) / 8;
     size_t data_bitmap_bytes = (num_blocks + 7) / 8;
 
     // Calculate offsets
-    size_t superblock_size = sizeof(struct wfs_sb_ext);
+    size_t superblock_size = sizeof(struct wfsSbExtended);
     off_t i_bitmap_off = superblock_size;
     off_t d_bitmap_off = i_bitmap_off + inode_bitmap_bytes;
     off_t i_start = d_bitmap_off + data_bitmap_bytes;
@@ -83,7 +82,7 @@ int main(int argc, char *argv[]) {
     off_t d_start = i_start + (num_inodes * BLOCK_SIZE);
 
     // Initialize superblock
-    struct wfs_sb_ext sb = {
+    struct wfsSbExtended sb = {
         .base = {
             .num_inodes = num_inodes,
             .num_data_blocks = num_blocks,
