@@ -66,13 +66,7 @@ int main(int argc, char *argv[]) {
     //Offsets
     off_t i_bitmap_off = sizeof(struct wfsSbExtended);
     off_t d_bitmap_off = i_bitmap_off + inode_bitmap_bytes;
-    off_t i_start = d_bitmap_off + data_bitmap_bytes;
-    
-    // Each inode must be at a location divisible by BLOCK_SIZE
-    i_start = ((i_start + BLOCK_SIZE - 1) / BLOCK_SIZE) * BLOCK_SIZE;
-    
-    // Calculate data blocks start
-    off_t d_start = i_start + (num_inodes * BLOCK_SIZE);
+    off_t i_start = (((d_bitmap_off + data_bitmap_bytes) + BLOCK_SIZE - 1) / BLOCK_SIZE) * BLOCK_SIZE;
 
     // Initialize superblock
     struct wfsSbExtended sb = {
@@ -82,14 +76,14 @@ int main(int argc, char *argv[]) {
             .i_bitmap_ptr = i_bitmap_off,
             .d_bitmap_ptr = d_bitmap_off,
             .i_blocks_ptr = i_start,
-            .d_blocks_ptr = d_start
+            .d_blocks_ptr = (i_start + (num_inodes * BLOCK_SIZE))
         },
         .raid_mode = raid_mode,
         .num_disks = num_disks
     };
 
     // Calculate total size needed
-    size_t fs_size = d_start + (num_blocks * BLOCK_SIZE);
+    size_t fs_size = (i_start + (num_inodes * BLOCK_SIZE)) + (num_blocks * BLOCK_SIZE);
 
     // Open all disks and map them
     int* fds = malloc(num_disks * sizeof(int));
