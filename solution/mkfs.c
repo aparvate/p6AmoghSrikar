@@ -27,22 +27,16 @@ int main(int argc, char *argv[]) {
     opt = getopt(argc, argv, "r:d:i:b:");
     while (opt != -1) {
         if (opt == 'r') {
-            int raidCheck = strcmp(optarg, "0");
-            if (raidCheck == 0) {
+            if (strcmp(optarg, "0") == 0) {
                 raid_mode = 0;
             }
-
-            raidCheck = strcmp(optarg, "1");
-            if (raidCheck == 0 && raid_mode == -1) {
+            else if (strcmp(optarg, "1") == 0) {
                 raid_mode = 1;
             }
-
-            raidCheck = strcmp(optarg, "1v");
-            if (raidCheck == 0 && raid_mode == -1) {
+            else if (strcmp(optarg, "1v") == 0) {
                 raid_mode = 2;
             }
-
-            if (raid_mode == -1) {
+            else {
                 return 1;
             }
             break;
