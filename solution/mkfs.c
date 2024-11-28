@@ -40,13 +40,13 @@ int main(int argc, char *argv[]) {
                     return -1;
                 }
             }
-            else if (opt == 'd'){
+            if (opt == 'd'){
                 disk_files[num_disks++] = optarg;
             }
-            else if (opt == 'i'){
+            if (opt == 'i'){
                 num_inodes = atoi(optarg);
             }
-            else if (opt == 'b'){
+            if (opt == 'b'){
                 num_blocks = atoi(optarg);
             }
         //}
