@@ -15,10 +15,12 @@ struct wfsSbExtended {
     int raidNum;
     int diskNum;
 } __attribute__((packed));
+
 void freeFunc(int* fds, void** diskMapStore){
     free(fds);
     free(diskMapStore);
 }
+
 int main(int argc, char *argv[]) {
     int opt;
     int raidNum = -1;
@@ -28,34 +30,32 @@ int main(int argc, char *argv[]) {
     int diskNum = 0;
 
     while ((opt = getopt(argc, argv, "r:d:i:b:")) != -1) {
-        //switch (opt) {
-            if (opt == 'r'){
-                if (strcmp(optarg, "0") == 0) {
-                    raidNum = 0;
-                }
-                else if (strcmp(optarg, "1") == 0) {
-                    raidNum = 1;
-                }
-                else if (strcmp(optarg, "1v") == 0) {
-                    raidNum = 2;
-                }
-                else {
-                    return 1;
-                }
+        if (opt == 'r'){
+            if (strcmp(optarg, "0") == 0) {
+                raidNum = 0;
             }
-            if (opt == 'd'){
-                disks[diskNum++] = optarg;
+            else if (strcmp(optarg, "1") == 0) {
+                raidNum = 1;
             }
-            if (opt == 'i'){
-                nodeNum = atoi(optarg);
+            else if (strcmp(optarg, "1v") == 0) {
+                raidNum = 2;
             }
-            if (opt == 'b'){
-                blockNum = atoi(optarg);
+            else {
+                return 1;
             }
-        //}
+        }
+        if (opt == 'd'){
+            disks[diskNum++] = optarg;
+        }
+        if (opt == 'i'){
+            nodeNum = atoi(optarg);
+        }
+        if (opt == 'b'){
+            blockNum = atoi(optarg);
+        }
     }
 
-    // Error checking
+    //Errors
     if (raidNum == -1 || diskNum < 2 || nodeNum <= 0 || blockNum <= 0) {
         return 1;
     }
@@ -71,7 +71,10 @@ int main(int argc, char *argv[]) {
     off_t dOff = iOff + nodeSize;
     off_t iStart = (((dOff + dataSize) + BLOCK_SIZE - 1) / BLOCK_SIZE) * BLOCK_SIZE;
 
-    // Initialize superblock
+    //Size
+    size_t fsSize = (iStart + (nodeNum * BLOCK_SIZE)) + (blockNum * BLOCK_SIZE);
+
+    //Blocks
     struct wfsSbExtended sb = {
         .base = {
             .num_inodes = nodeNum,
@@ -85,10 +88,6 @@ int main(int argc, char *argv[]) {
         .diskNum = diskNum
     };
 
-    // Calculate total size needed
-    size_t fsSize = (iStart + (nodeNum * BLOCK_SIZE)) + (blockNum * BLOCK_SIZE);
-
-    // Open all disks and map them
     int* fds = malloc(diskNum * sizeof(int));
     void** diskMapStore = malloc(diskNum * sizeof(void*));
 
@@ -124,14 +123,13 @@ int main(int argc, char *argv[]) {
             freeFunc(fds, diskMapStore);
             return -1;
         }
-
         // Writing
         memset(diskMapStore[i], 0, fsSize);
         memcpy(diskMapStore[i], &sb, sizeof(sb));
         char* nodeMapSize = (char*)diskMapStore[i] + iOff;
         memset(nodeMapSize, 0, nodeSize);
         nodeMapSize[0] = 1;
-
+        // Root
         struct wfs_inode root = {0};
         root.mode = S_IFDIR | 0755;
         root.uid = getuid();
@@ -144,8 +142,7 @@ int main(int argc, char *argv[]) {
 
         msync(diskMapStore[i], fsSize, MS_SYNC);
     }
-
-    // Cleanup
+    // Cleaning
     for (int i = 0; i < diskNum; i++) {
         munmap(diskMapStore[i], fsSize);
         close(fds[i]);
