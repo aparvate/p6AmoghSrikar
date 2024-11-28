@@ -12,131 +12,131 @@
 
 struct wfsSbExtended {
     struct wfs_sb base;
-    int raid_mode;
-    int num_disks;
+    int raidNum;
+    int diskNum;
 } __attribute__((packed));
 
 int main(int argc, char *argv[]) {
     int opt;
-    int raid_mode = -1;
-    int num_inodes = -1;
-    int num_blocks = -1;
-    char* disk_files[256] = {NULL};
-    int num_disks = 0;
+    int raidNum = -1;
+    int nodeNum = -1;
+    int blockNum = -1;
+    char* disks[256] = {NULL};
+    int diskNum = 0;
 
     while ((opt = getopt(argc, argv, "r:d:i:b:")) != -1) {
         //switch (opt) {
             if (opt == 'r'){
                 if (strcmp(optarg, "0") == 0) {
-                    raid_mode = 0;
+                    raidNum = 0;
                 }
                 else if (strcmp(optarg, "1") == 0) {
-                    raid_mode = 1;
+                    raidNum = 1;
                 }
                 else if (strcmp(optarg, "1v") == 0) {
-                    raid_mode = 2;
+                    raidNum = 2;
                 }
                 else {
                     return 1;
                 }
             }
             if (opt == 'd'){
-                disk_files[num_disks++] = optarg;
+                disks[diskNum++] = optarg;
             }
             if (opt == 'i'){
-                num_inodes = atoi(optarg);
+                nodeNum = atoi(optarg);
             }
             if (opt == 'b'){
-                num_blocks = atoi(optarg);
+                blockNum = atoi(optarg);
             }
         //}
     }
 
     // Error checking
-    if (raid_mode == -1 || num_disks < 2 || num_inodes <= 0 || num_blocks <= 0) {
+    if (raidNum == -1 || diskNum < 2 || nodeNum <= 0 || blockNum <= 0) {
         return 1;
     }
 
     //Sizes
-    num_blocks = ((num_blocks + 31) / 32) * 32;
-    num_inodes = ((num_inodes + 31) / 32) * 32;
-    size_t data_bitmap_bytes = (num_blocks + 7) / 8;
-    size_t inode_bitmap_bytes = (num_inodes + 7) / 8;
+    blockNum = ((blockNum + 31) / 32) * 32;
+    nodeNum = ((nodeNum + 31) / 32) * 32;
+    size_t dataSize = (blockNum + 7) / 8;
+    size_t nodeSize = (nodeNum + 7) / 8;
 
     //Offsets
-    off_t i_bitmap_off = sizeof(struct wfsSbExtended);
-    off_t d_bitmap_off = i_bitmap_off + inode_bitmap_bytes;
-    off_t i_start = (((d_bitmap_off + data_bitmap_bytes) + BLOCK_SIZE - 1) / BLOCK_SIZE) * BLOCK_SIZE;
+    off_t iOff = sizeof(struct wfsSbExtended);
+    off_t dOff = iOff + nodeSize;
+    off_t iStart = (((dOff + dataSize) + BLOCK_SIZE - 1) / BLOCK_SIZE) * BLOCK_SIZE;
 
     // Initialize superblock
     struct wfsSbExtended sb = {
         .base = {
-            .num_inodes = num_inodes,
-            .num_data_blocks = num_blocks,
-            .i_bitmap_ptr = i_bitmap_off,
-            .d_bitmap_ptr = d_bitmap_off,
-            .i_blocks_ptr = i_start,
-            .d_blocks_ptr = (i_start + (num_inodes * BLOCK_SIZE))
+            .num_inodes = nodeNum,
+            .num_data_blocks = blockNum,
+            .i_bitmap_ptr = iOff,
+            .d_bitmap_ptr = dOff,
+            .i_blocks_ptr = iStart,
+            .d_blocks_ptr = (iStart + (nodeNum * BLOCK_SIZE))
         },
-        .raid_mode = raid_mode,
-        .num_disks = num_disks
+        .raidNum = raidNum,
+        .diskNum = diskNum
     };
 
     // Calculate total size needed
-    size_t fs_size = (i_start + (num_inodes * BLOCK_SIZE)) + (num_blocks * BLOCK_SIZE);
+    size_t fsSize = (iStart + (nodeNum * BLOCK_SIZE)) + (blockNum * BLOCK_SIZE);
 
     // Open all disks and map them
-    int* fds = malloc(num_disks * sizeof(int));
-    void** disk_maps = malloc(num_disks * sizeof(void*));
+    int* fds = malloc(diskNum * sizeof(int));
+    void** diskMapStore = malloc(diskNum * sizeof(void*));
 
-    for (int i = 0; i < num_disks; i++) {
-        fds[i] = open(disk_files[i], O_RDWR);
+    for (int i = 0; i < diskNum; i++) {
+        fds[i] = open(disks[i], O_RDWR);
         if (fds[i] < 0) {
             for (int j = 0; j < i; j++) {
-                munmap(disk_maps[j], fs_size);
+                munmap(diskMapStore[j], fsSize);
                 close(fds[j]);
             }
             free(fds);
-            free(disk_maps);
+            free(diskMapStore);
             return -1;
         }
         struct stat st;
-        if (fstat(fds[i], &st) < 0 || st.st_size < fs_size) {
+        if (fstat(fds[i], &st) < 0 || st.st_size < fsSize) {
             for (int j = 0; j < i; j++) {
-                munmap(disk_maps[j], fs_size);
+                munmap(diskMapStore[j], fsSize);
                 close(fds[j]);
             }
             close(fds[i]);
             free(fds);
-            free(disk_maps);
+            free(diskMapStore);
             return -1;
         }
-        disk_maps[i] = mmap(NULL, fs_size, PROT_READ | PROT_WRITE, MAP_SHARED, fds[i], 0);
-        if (disk_maps[i] == MAP_FAILED) {
+        diskMapStore[i] = mmap(NULL, fsSize, PROT_READ | PROT_WRITE, MAP_SHARED, fds[i], 0);
+        if (diskMapStore[i] == MAP_FAILED) {
             for (int j = 0; j < i; j++) {
-                munmap(disk_maps[j], fs_size);
+                munmap(diskMapStore[j], fsSize);
                 close(fds[j]);
             }
             close(fds[i]);
             free(fds);
-            free(disk_maps);
+            free(diskMapStore);
             return -1;
         }
 
         // Zero out the entire disk
-        memset(disk_maps[i], 0, fs_size);
+        memset(diskMapStore[i], 0, fsSize);
 
         // Write superblock
-        memcpy(disk_maps[i], &sb, sizeof(sb));
+        memcpy(diskMapStore[i], &sb, sizeof(sb));
 
         // Write inode bitmap
-        char* inode_bitmap = (char*)disk_maps[i] + i_bitmap_off;
-        memset(inode_bitmap, 0, inode_bitmap_bytes);
-        inode_bitmap[0] = 1;  // Mark first inode as used
+        char* nodeMapSize = (char*)diskMapStore[i] + iOff;
+        memset(nodeMapSize, 0, nodeSize);
+        nodeMapSize[0] = 1;  // Mark first inode as used
 
         // Write data bitmap
-        char* data_bitmap = (char*)disk_maps[i] + d_bitmap_off;
-        memset(data_bitmap, 0, data_bitmap_bytes);
+        char* dataMapSize = (char*)diskMapStore[i] + dOff;
+        memset(dataMapSize, 0, dataSize);
 
         // Write root inode
         struct wfs_inode root = {0};
@@ -147,18 +147,18 @@ int main(int argc, char *argv[]) {
         root.atim = time(NULL);
         root.mtim = time(NULL);
         root.ctim = time(NULL);
-        memcpy((char*)disk_maps[i] + i_start, &root, sizeof(root));
+        memcpy((char*)diskMapStore[i] + iStart, &root, sizeof(root));
 
         // Sync changes to disk
-        msync(disk_maps[i], fs_size, MS_SYNC);
+        msync(diskMapStore[i], fsSize, MS_SYNC);
     }
 
     // Cleanup
-    for (int i = 0; i < num_disks; i++) {
-        munmap(disk_maps[i], fs_size);
+    for (int i = 0; i < diskNum; i++) {
+        munmap(diskMapStore[i], fsSize);
         close(fds[i]);
     }
     free(fds);
-    free(disk_maps);
+    free(diskMapStore);
     return 0;  // Success - everything worked
 }
