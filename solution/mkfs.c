@@ -25,27 +25,27 @@ int main(int argc, char *argv[]) {
     int num_disks = 0;
 
     opt = getopt(argc, argv, "r:d:i:b:");
-    while (opt != -1) {
+    //while (opt != -1) {
         if (opt == 'r') {
             if (strcmp(optarg, "0") == 0) raid_mode = 0;
             else if (strcmp(optarg, "1") == 0) raid_mode = 1;
             else if (strcmp(optarg, "1v") == 0) raid_mode = 2;
             else return 1;  // Usage error - invalid RAID mode
-            break;
+            //break;
         }
         else if (opt == 'd') {
             disk_files[num_disks++] = optarg;
-            break;
+            //break;
         }
         else if (opt == 'i') {
             num_inodes = atoi(optarg);
-            break;
+            //break;
         }
         else if (opt == 'b') {
             num_blocks = atoi(optarg);
-            break;
+            //break;
         }
-    }
+    //}
 
     if (raid_mode == -1) {
         fprintf(stderr, "Error: No raid mode specified.\n");
