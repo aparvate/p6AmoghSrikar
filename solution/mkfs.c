@@ -26,6 +26,7 @@ int main(int argc, char *argv[]) {
 
     opt = getopt(argc, argv, "r:d:i:b:");
     while (opt != -1) {
+        opt = getopt(argc, argv, "r:d:i:b:");
         if (opt == 'r') {
             if (strcmp(optarg, "0") == 0) raid_mode = 0;
             else if (strcmp(optarg, "1") == 0) raid_mode = 1;
