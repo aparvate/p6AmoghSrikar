@@ -98,9 +98,8 @@ int main(int argc, char *argv[]) {
             }
             free(fds);
             free(disk_maps);
-            return -1;  // Runtime error - file operation failed
+            return -1;
         }
-
         struct stat st;
         if (fstat(fds[i], &st) < 0 || st.st_size < fs_size) {
             for (int j = 0; j < i; j++) {
@@ -110,10 +109,8 @@ int main(int argc, char *argv[]) {
             close(fds[i]);
             free(fds);
             free(disk_maps);
-            return -1;  // Runtime error - file too small or stat failed
+            return -1;
         }
-
-        // Map the entire disk
         disk_maps[i] = mmap(NULL, fs_size, PROT_READ | PROT_WRITE, MAP_SHARED, fds[i], 0);
         if (disk_maps[i] == MAP_FAILED) {
             for (int j = 0; j < i; j++) {
@@ -123,7 +120,7 @@ int main(int argc, char *argv[]) {
             close(fds[i]);
             free(fds);
             free(disk_maps);
-            return -1;  // Runtime error - mapping failed
+            return -1;
         }
 
         // Zero out the entire disk
