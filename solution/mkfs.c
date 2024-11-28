@@ -15,7 +15,7 @@ struct wfsSbExtended {
     int raidNum;
     int diskNum;
 } __attribute__((packed));
-void freeFunc(int fds, void** diskMapStore){
+void freeFunc(int* fds, void** diskMapStore){
     free(fds);
     free(diskMapStore);
 }
