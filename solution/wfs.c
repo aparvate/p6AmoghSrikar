@@ -15,6 +15,43 @@ int raid_mode;
 char *disks[10];
 void *disk_images[10];
 
+size_t allocate_block(uint32_t *bitmap, size_t size) {
+  for (uint32_t i = 0; i < size; i++) {
+    uint32_t bitmap_region = bitmap[i];
+    uint32_t k = 0;
+    while (bitmap_region != UINT32_MAX && k < 32) {
+      if (!((bitmap_region >> k) & 0x1)) {
+        bitmap[i] = bitmap[i] | (0x1 << k);
+        return i * 32 + k;
+      }
+      k++;
+    }
+  }
+  return -1;
+}
+
+off_t allocate_DB() {
+  struct wfs_sb *superblock = (struct wfs_sb *)disk_images[0];
+  off_t num = allocate_block((uint32_t *)((char *)disk_images[0] + superblock->d_bitmap_ptr), superblock->num_data_blocks / 32);
+  if (num < 0) {
+    err = -ENOSPC;  
+    return -1;
+  }
+  return superblock->d_blocks_ptr + BLOCK_SIZE * num;
+}
+
+struct wfs_inode *allocate_inode() {
+  struct wfs_sb *superblock = (struct wfs_sb *)disk_images[0];
+  off_t num = allocate_block((uint32_t *)((char *)disk_images[0] + superblock->d_bitmap_ptr), superblock->num_inodes / 32);
+  if (num < 0) {
+    err = -ENOSPC;
+    return NULL;
+  }
+  struct wfs_inode *inode = (struct wfs_inode *)((char *)mmap_ptr(superblock->i_blocks_ptr) + num * BLOCK_SIZE);
+  inode->num = num;
+  return inode;
+}
+
 struct wfs_inode *locate_inode(const char *path) {
     if (strcmp("/", path) == 0) {
         printf("Found root path\n");
@@ -57,7 +94,6 @@ struct wfs_inode *locate_inode(const char *path) {
     return current_inode;
 }
 
-
 static int wfs_getattr(const char *path, struct stat *stbuf) {
   printf("Get attribute starting\n");
   memset(stbuf, 0, sizeof(struct stat));
@@ -94,35 +130,35 @@ static int wfs_getattr(const char *path, struct stat *stbuf) {
 
 static int wfs_mknod(const char *path, mode_t mode, dev_t dev) {
   printf("Starting mknod\n");
-  struct wfs_sb *superblock = (struct wfs_sb *)disk_images[0];
-  struct wfs_inode *inode_table = (struct wfs_inode *)((char *)disk_images[0] + superblock->i_blocks_ptr);
-  size_t num_inodes = superblock->num_inodes;
-  printf("Superblock set, table set, num_inodes set\n");
+  // struct wfs_sb *superblock = (struct wfs_sb *)disk_images[0];
+  // struct wfs_inode *inode_table = (struct wfs_inode *)((char *)disk_images[0] + superblock->i_blocks_ptr);
+  // size_t num_inodes = superblock->num_inodes;
+  // printf("Superblock set, table set, num_inodes set\n");
 
-  struct wfs_inode *new_inode = NULL;
-  for (size_t i = 0; i < num_inodes; i++) {
-    printf("inode: %zd \n", i);
-    if (inode_table[i].nlinks == 0) {
-      new_inode = &inode_table[i];
-      break;
-    }
-  }
+  // struct wfs_inode *new_inode = NULL;
+  // for (size_t i = 0; i < num_inodes; i++) {
+  //   printf("inode: %zd \n", i);
+  //   if (inode_table[i].nlinks == 0) {
+  //     new_inode = &inode_table[i];
+  //     break;
+  //   }
+  // }
 
-  if (!new_inode) {
-    printf("No INODE\n");
-    return -ENOSPC;
-  }
-  // Initialize the new inode
-  memset(new_inode, 0, sizeof(struct wfs_inode));
-  new_inode->mode = S_IFDIR | mode;
-  new_inode->uid = getuid();
-  new_inode->gid = getgid();
-  new_inode->nlinks = 2;
-  new_inode->atim = time(NULL);
-  new_inode->mtim = time(NULL);
-  new_inode->ctim = time(NULL);
+  // if (!new_inode) {
+  //   printf("No INODE\n");
+  //   return -ENOSPC;
+  // }
+  // // Initialize the new inode
+  // memset(new_inode, 0, sizeof(struct wfs_inode));
+  // new_inode->mode = S_IFDIR | mode;
+  // new_inode->uid = getuid();
+  // new_inode->gid = getgid();
+  // new_inode->nlinks = 2;
+  // new_inode->atim = time(NULL);
+  // new_inode->mtim = time(NULL);
+  // new_inode->ctim = time(NULL);
 
-  printf("mknod called for path: %s\n", path);
+  // printf("mknod called for path: %s\n", path);
   return 0;
 }
 
@@ -134,14 +170,7 @@ int wfs_mkdir(const char *path, mode_t mode) {
   printf("Superblock set, table set, num_inodes set\n");
 
   // Find a free inode
-  struct wfs_inode *new_inode = NULL;
-  for (size_t i = 0; i < num_inodes; i++) {
-    printf("inode: %zd \n", i);
-    if (inode_table[i].nlinks == 0) {
-      new_inode = &inode_table[i];
-      break;
-    }
-  }
+  struct wfs_inode *new_inode = allocate_inode();
 
   if (!new_inode) {
     printf("No INODE\n");
