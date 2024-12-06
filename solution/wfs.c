@@ -155,14 +155,17 @@ static struct fuse_operations ops = {
 int main(int argc, char *argv[]) {
     raid_mode = 1;
 
+    printf("Hawk Tuah!");
+
     num_disks = 0;
     while (argv[3 + num_disks] && argv[3 + num_disks][0] != '-') {
-        num_disks++;
+      printf("NumDisks: %d", num_disks);
+      num_disks++;
     }
     
     // Set up disk images (i.e., the array of paths to disk images)
     for (int i = 0; i < num_disks; i++) {
-      cprintf("Arg %d: %s", i, argv[3 + i]);
+      printf("Arg %d: %s\n", i, argv[3 + i]);
       disk_images[i] = argv[3 + i];
     }
 
