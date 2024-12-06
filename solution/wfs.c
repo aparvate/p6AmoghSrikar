@@ -272,7 +272,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Create a new array for FUSE arguments
-  int fuse_argc = argc - num_disks + 1; // Exclude disk images and argv[0], add space for 1 null ending
+  int fuse_argc = argc - num_disks; // Exclude disk images and argv[0], add space for 1 null ending
   char **fuse_argv = malloc(fuse_argc * sizeof(char *));
   if (!fuse_argv) {
     perror("Error allocating memory for FUSE arguments");
@@ -288,10 +288,10 @@ int main(int argc, char *argv[]) {
   // Debug: Print updated argc and argv for FUSE
   printf("FUSE argc: %d\n", fuse_argc);
   printf("FUSE argv:\n");
-  for (int i = 0; i < fuse_argc; i++) {
+  for (int i = 0; i < fuse_argc-1; i++) {
     printf("  argv[%d]: %s\n", i, fuse_argv[i]);
   }
-  fuse_argc = fuse_argc - 1;
+  //fuse_argc = fuse_argc - 1;
 
   // Start FUSE
   int result = fuse_main(fuse_argc, fuse_argv, &ops, NULL);
