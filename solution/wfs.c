@@ -216,9 +216,11 @@ int main(int argc, char *argv[]) {
 
   // Start FUSE
   int result = fuse_main(fuse_argc, fuse_argv, &ops, NULL);
+  printf("Fuse main passed\n");
 
   // Free allocated memory
   free(fuse_argv);
+  printf("Args freed\n");
 
   return result;
 }
