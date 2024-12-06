@@ -223,6 +223,7 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < fuse_argc; i++) {
     printf("  argv[%d]: %s\n", i, fuse_argv[i]);
   }
+  int fuse_argc = fuse_argc - 1;
 
   static struct fuse_operations ops = {
     .getattr = wfs_getattr,
