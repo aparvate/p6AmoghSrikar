@@ -69,13 +69,13 @@ static int wfs_mknod(const char *path, mode_t mode, dev_t dev) {
   return 0;
 }
 
-int wfs_mkdir(const char path, mode_t mode) {
-    struct wfs_sbsuperblock = (struct wfs_sb )disk_images[0];
-    struct wfs_inodeinode_table = (struct wfs_inode )((char)disk_images[0] + superblock->i_blocks_ptr);
+int wfs_mkdir(const char *path, mode_t mode) {
+    struct wfs_sb *superblock = (struct wfs_sb *)disk_images[0];
+    struct wfs_inode *inode_table = (struct wfs_inode *)((char *)disk_images[0] + superblock->i_blocks_ptr);
     size_t num_inodes = superblock->num_inodes;
 
     // Find a free inode
-    struct wfs_inode new_inode = NULL;
+    struct wfs_inode *new_inode = NULL;
     for (size_t i = 0; i < num_inodes; i++) {
         if (inode_table[i].nlinks == 0) {
             new_inode = &inode_table[i];
@@ -98,12 +98,12 @@ int wfs_mkdir(const char path, mode_t mode) {
     new_inode->ctim = time(NULL);
 
     // Find a free directory entry
-    struct wfs_inodeparent_inode = locate_inode("/"); // Assuming root for simplicity
+    struct wfs_inode *parent_inode = locate_inode("/"); // Assuming root for simplicity
     if (!parent_inode) {
         return -ENOENT;
     }
 
-    struct wfs_dentry dentry_table = (struct wfs_dentry)((char *)disk_images[0] + parent_inode->blocks[0]);
+    struct wfs_dentry *dentry_table = (struct wfs_dentry *)((char *)disk_images[0] + parent_inode->blocks[0]);
     for (size_t i = 0; i < BLOCK_SIZE / sizeof(struct wfs_dentry); i++) {
         if (dentry_table[i].num == 0) {
             strncpy(dentry_table[i].name, path, MAX_NAME);
