@@ -197,7 +197,6 @@ int main(int argc, char *argv[]) {
     // const char *mount_point = argv[3 + num_disks];
     
     // Set up disk images (i.e., the array of paths to disk images)
-    *disk_images[num_disks];
     for (int i = 0; i < num_disks; i++) {
         disk_images[i] = argv[3 + i];
     }
