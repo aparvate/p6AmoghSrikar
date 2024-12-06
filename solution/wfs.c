@@ -93,10 +93,6 @@ static int wfs_getattr(const char *path, struct stat *stbuf) {
 }
 
 static int wfs_mknod(const char *path, mode_t mode, dev_t dev) {
-  if (mode_t != 1){
-    printf(":< waka waka waka");
-  }
-
   // Initialize the new inode
   memset(new_inode, 0, sizeof(struct wfs_inode));
   new_inode->mode = S_IFDIR | mode;
