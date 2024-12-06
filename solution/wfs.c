@@ -16,32 +16,47 @@ char *disks[10];
 void *disk_images[10];
 
 struct wfs_inode *locate_inode(const char *path) {
-  if (strcmp("/", path) == 0) {
-    printf("Found path\n");
-    return 0;
-  }
-
-  struct wfs_sb *superblock = (struct wfs_sb *)disk_images[0];
-  struct wfs_inode *inode_table = (struct wfs_inode *)((char *)disk_images[0] + superblock->i_blocks_ptr);
-  size_t num_inodes = superblock->num_inodes;
-  printf("Superblock set, table set, num_inodes set\n");
-
-  for (size_t i = 0; i < num_inodes; i++) {
-    struct wfs_inode *inode = &inode_table[i];
-    printf("inode: %zd \n", i);
-    if (inode->nlinks > 0) {
-      struct wfs_dentry *dentry_table = (struct wfs_dentry *)((char *)disk_images[0] + inode->blocks[0]);
-      for (size_t j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
-        if (strcmp(dentry_table[j].name, path) == 0) {
-          printf("Found path\n");
-          return inode;
-        }
-      }
+    if (strcmp("/", path) == 0) {
+        printf("Found root path\n");
+        struct wfs_sb *superblock = (struct wfs_sb *)disk_images[0];
+        struct wfs_inode *inode_table = (struct wfs_inode *)((char *)disk_images[0] + superblock->i_blocks_ptr);
+        return &inode_table[0]; // Return the root inode
     }
-  }
 
-  return NULL; // fails
+    struct wfs_sb *superblock = (struct wfs_sb *)disk_images[0];
+    struct wfs_inode *inode_table = (struct wfs_inode *)((char *)disk_images[0] + superblock->i_blocks_ptr);
+    printf("Superblock and inode table initialized.\n");
+
+    char path_copy[strlen(path) + 1];
+    strcpy(path_copy, path);
+
+    char *token = strtok(path_copy, "/");
+    struct wfs_inode *current_inode = &inode_table[0]; // Start at the root inode
+
+    while (token != NULL) {
+        int found = 0;
+        struct wfs_dentry *dentry_table = (struct wfs_dentry *)((char *)disk_images[0] + current_inode->blocks[0]);
+
+        for (size_t i = 0; i < BLOCK_SIZE / sizeof(struct wfs_dentry); i++) {
+            if (dentry_table[i].num > 0 && strcmp(dentry_table[i].name, token) == 0) {
+                current_inode = &inode_table[dentry_table[i].num];
+                found = 1;
+                break; // Stop searching once the directory entry is found
+            }
+        }
+
+        if (!found) {
+            printf("Path component '%s' not found.\n", token);
+            return NULL; // Stop if the current token is not found
+        }
+
+        token = strtok(NULL, "/"); // Move to the next component in the path
+    }
+
+    printf("Inode found for path.\n");
+    return current_inode;
 }
+
 
 static int wfs_getattr(const char *path, struct stat *stbuf) {
   printf("Get attribute starting\n");
