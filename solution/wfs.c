@@ -161,6 +161,7 @@ int main(int argc, char *argv[]) {
     while (argv[num_disks] && (argv[num_disks][0] != '-' || strcmp ("./wfs", argv[num_disks]))) {
       printf("NumDisks: %d \n", num_disks);
       printf("What is the argument: %s \n", argv[num_disks]);
+      printf("What is the first character: %c \n", argv[num_disks][0]);
       num_disks++;
     }
     
