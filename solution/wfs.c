@@ -155,11 +155,11 @@ static struct fuse_operations ops = {
 int main(int argc, char *argv[]) {
     raid_mode = 1;
 
-    printf("Hawk Tuah!");
+    printf("Hawk Tuah!\n");
 
     num_disks = 0;
-    while (argv[3 + num_disks] && argv[3 + num_disks][0] != '-') {
-      printf("NumDisks: %d", num_disks);
+    while (argv[num_disks] && (argv[num_disks][0] != '-' || strcmp ("./wfs", argv[num_disks]))) {
+      printf("NumDisks: %d\b", num_disks);
       num_disks++;
     }
     
