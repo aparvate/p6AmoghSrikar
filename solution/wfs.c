@@ -203,7 +203,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Copy FUSE-related arguments to fuse_argv (skip argv[0] and disk image paths)
-  fuse_argv[0] = './wfs';
+  fuse_argv[0] = "./wfs";
   for (int i = num_disks + 1; i < argc; i++) {
     fuse_argv[i - num_disks] = argv[i];
   }
