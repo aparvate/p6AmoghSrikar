@@ -176,17 +176,6 @@ static int wfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_
   return 0;
 }
 
-static struct fuse_operations ops = {
-  .getattr = wfs_getattr,
-  .mknod   = wfs_mknod,
-  .mkdir   = wfs_mkdir,
-  .unlink  = wfs_unlink,
-  .rmdir   = wfs_rmdir,
-  .read    = wfs_read,
-  .write   = wfs_write,
-  .readdir = wfs_readdir,
-};
-
 int main(int argc, char *argv[]) {
   if (argc < 3) {
     return -1;
@@ -215,7 +204,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Create a new array for FUSE arguments
-  int fuse_argc = argc - num_disks; // Exclude disk images and argv[0]
+  int fuse_argc = argc - num_disks + 1; // Exclude disk images and argv[0], add space for 1 null ending
   char **fuse_argv = malloc(fuse_argc * sizeof(char *));
   if (!fuse_argv) {
     perror("Error allocating memory for FUSE arguments");
@@ -234,6 +223,17 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < fuse_argc; i++) {
     printf("  argv[%d]: %s\n", i, fuse_argv[i]);
   }
+
+  static struct fuse_operations ops = {
+    .getattr = wfs_getattr,
+    .mknod   = wfs_mknod,
+    .mkdir   = wfs_mkdir,
+    .unlink  = wfs_unlink,
+    .rmdir   = wfs_rmdir,
+    .read    = wfs_read,
+    .write   = wfs_write,
+    .readdir = wfs_readdir,
+  };
 
   // Start FUSE
   int result = fuse_main(fuse_argc, fuse_argv, &ops, NULL);
