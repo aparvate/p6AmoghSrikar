@@ -93,6 +93,25 @@ static int wfs_getattr(const char *path, struct stat *stbuf) {
 }
 
 static int wfs_mknod(const char *path, mode_t mode, dev_t dev) {
+  printf("Starting mknod\n");
+  struct wfs_sb *superblock = (struct wfs_sb *)disk_images[0];
+  struct wfs_inode *inode_table = (struct wfs_inode *)((char *)disk_images[0] + superblock->i_blocks_ptr);
+  size_t num_inodes = superblock->num_inodes;
+  printf("Superblock set, table set, num_inodes set\n");
+
+  struct wfs_inode *new_inode = NULL;
+  for (size_t i = 0; i < num_inodes; i++) {
+    printf("inode: %zd \n", i);
+    if (inode_table[i].nlinks == 0) {
+      new_inode = &inode_table[i];
+      break;
+    }
+  }
+
+  if (!new_inode) {
+    printf("No INODE\n");
+    return -ENOSPC;
+  }
   // Initialize the new inode
   memset(new_inode, 0, sizeof(struct wfs_inode));
   new_inode->mode = S_IFDIR | mode;
