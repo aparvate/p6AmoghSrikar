@@ -162,7 +162,7 @@ int main(int argc, char *argv[]) {
     
     // Set up disk images (i.e., the array of paths to disk images)
     for (int i = 0; i < num_disks; i++) {
-      printf("Arg %d: %s", i, argv[3 + i]);
+      cprintf("Arg %d: %s", i, argv[3 + i]);
       disk_images[i] = argv[3 + i];
     }
 
