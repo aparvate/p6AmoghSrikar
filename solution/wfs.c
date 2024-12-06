@@ -23,7 +23,7 @@ struct wfs_inode *locate_inode(const char *path) {
 
   for (size_t i = 0; i < num_inodes; i++) {
     struct wfs_inode *inode = &inode_table[i];
-    printf("inode: %d \n", i);
+    printf("inode: %zd \n", i);
     if (inode->nlinks > 0) {
       struct wfs_dentry *dentry_table = (struct wfs_dentry *)((char *)disk_images[0] + inode->blocks[0]);
       for (size_t j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
@@ -86,7 +86,7 @@ int wfs_mkdir(const char *path, mode_t mode) {
     // Find a free inode
     struct wfs_inode *new_inode = NULL;
     for (size_t i = 0; i < num_inodes; i++) {
-      printf("inode: %d \n", i);
+      printf("inode: %zd \n", i);
       if (inode_table[i].nlinks == 0) {
         new_inode = &inode_table[i];
         break;
@@ -117,7 +117,7 @@ int wfs_mkdir(const char *path, mode_t mode) {
 
     struct wfs_dentry *dentry_table = (struct wfs_dentry *)((char *)disk_images[0] + parent_inode->blocks[0]);
     for (size_t i = 0; i < BLOCK_SIZE / sizeof(struct wfs_dentry); i++) {
-      printf("dentry: %d \n", i);
+      printf("dentry: %zd \n", i);
       if (dentry_table[i].num == 0) {
         printf("Creating new directory");
         strncpy(dentry_table[i].name, path, MAX_NAME);
