@@ -159,13 +159,13 @@ int main(int argc, char *argv[]) {
 
     num_disks = 0;
     while (argv[num_disks] && (argv[num_disks][0] != '-' || strcmp ("./wfs", argv[num_disks]))) {
-      printf("NumDisks: %d\n", num_disks);
+      printf("NumDisks: %d \n", num_disks);
       num_disks++;
     }
     
     // Set up disk images (i.e., the array of paths to disk images)
     for (int i = 0; i < num_disks; i++) {
-      printf("Arg %d: %s\n", i, argv[3 + i]);
+      printf("Arg %d: %s \n", i, argv[3 + i]);
       disk_images[i] = argv[3 + i];
     }
 
