@@ -12,20 +12,103 @@
 void *mapped_region;
 struct wfs_sb *superblock;
 
-int my_getattr() {
-    printf("hello1\n");
+int my_getattr(const char *path, struct stat *stbuf) {
+    printf("Getting attributes for: %s\n", path);
+    memset(stbuf, 0, sizeof(struct stat));
+
+    if (strcmp(path, "/") == 0) {
+        // Root directory
+        stbuf->st_mode = S_IFDIR | 0755;
+        stbuf->st_nlink = 2;
+        return 0;
+    }
+
+    // Locate the inode for the given path
+    struct wfs_inode *inode = NULL;
+    struct wfs_inode *inode_table = (struct wfs_inode *)((char *)mapped_region + superblock->i_blocks_ptr);
+    for (int i = 0; i < superblock->num_inodes; i++) {
+        if (inode_table[i].nlinks > 0) {
+            struct wfs_dentry *dentry_table = (struct wfs_dentry *)((char *)mapped_region + inode_table[i].blocks[0]);
+            for (int j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
+                if (strcmp(dentry_table[j].name, path + 1) == 0) {  // Remove leading '/'
+                    inode = &inode_table[dentry_table[j].num];
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!inode) {
+        return -ENOENT;  // File or directory not found
+    }
+
+    // Populate the stat structure
+    stbuf->st_mode = inode->mode;
+    stbuf->st_uid = inode->uid;
+    stbuf->st_gid = inode->gid;
+    stbuf->st_size = inode->size;
+    stbuf->st_nlink = inode->nlinks;
+    stbuf->st_atime = inode->atim;
+    stbuf->st_mtime = inode->mtim;
+    stbuf->st_ctime = inode->ctim;
+
     return 0;
 }
+
 
 int my_mknod() {
     printf("hello2\n");
     return 0;
 }
 
-int my_mkdir() {
-    printf("hai3\n");
-    return 0;
+int my_mkdir(const char *path, mode_t mode) {
+    printf("Creating directory: %s\n", path);
+
+    // Locate the parent directory (assume root directory "/" for simplicity)
+    struct wfs_inode *parent_inode = (struct wfs_inode *)((char *)mapped_region + superblock->i_blocks_ptr);
+    if (!parent_inode) {
+        return -ENOENT;
+    }
+
+    // Find a free inode
+    struct wfs_inode *inode_table = (struct wfs_inode *)((char *)mapped_region + superblock->i_blocks_ptr);
+    struct wfs_inode *new_inode = NULL;
+    for (int i = 0; i < superblock->num_inodes; i++) {
+        if (inode_table[i].nlinks == 0) {
+            new_inode = &inode_table[i];
+            break;
+        }
+    }
+
+    if (!new_inode) {
+        return -ENOSPC;  // No free inodes
+    }
+
+    // Initialize the new inode
+    memset(new_inode, 0, sizeof(struct wfs_inode));
+    new_inode->mode = S_IFDIR | mode;
+    new_inode->uid = getuid();
+    new_inode->gid = getgid();
+    new_inode->nlinks = 2;  // "." and parent
+    new_inode->size = 0;
+    new_inode->atim = time(NULL);
+    new_inode->mtim = time(NULL);
+    new_inode->ctim = time(NULL);
+
+    // Find a free directory entry in the parent directory
+    struct wfs_dentry *dentry_table = (struct wfs_dentry *)((char *)mapped_region + parent_inode->blocks[0]);
+    for (int i = 0; i < BLOCK_SIZE / sizeof(struct wfs_dentry); i++) {
+        if (dentry_table[i].num == 0) {
+            strncpy(dentry_table[i].name, path + 1, MAX_NAME);  // Remove leading '/'
+            dentry_table[i].num = new_inode - inode_table;
+            parent_inode->nlinks++;
+            return 0;
+        }
+    }
+
+    return -ENOSPC;  // No free directory entries
 }
+
 
 int my_unlink() {
     printf("hello4\n");
