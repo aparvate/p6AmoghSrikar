@@ -157,7 +157,7 @@ int wfs_mkdir(const char *path, mode_t mode) {
   new_inode->atim = time(NULL);
   new_inode->mtim = time(NULL);
   new_inode->ctim = time(NULL);
-  new_inode->num = 12
+  new_inode->num = 12;
 
   // Find a free directory entry
   struct wfs_inode *parent_inode = locate_inode("/");
