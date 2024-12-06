@@ -175,8 +175,10 @@ int main(int argc, char *argv[]) {
     char *fuse_args[argc - num_disks - 2];
     int fuse_arg_count = 0;
 
-    for (int i = 1 + num_disks; i < argc - 1; i++) {
-        fuse_args[fuse_arg_count++] = argv[i];
+    int i = 1 + num_disks;
+    while (i < argc - 1 && argv[i]) {
+      fuse_args[fuse_arg_count++] = argv[i];
+      i++;
     }
     fuse_args[fuse_arg_count] = NULL;  // Null-terminate the arguments
 
