@@ -155,63 +155,17 @@ static struct fuse_operations ops = {
 static const char *usage = "Usage: ./wfs disk1 disk2 [FUSE options] mount_point\n";
 
 int main(int argc, char *argv[]) {
-    // Ensure there are at least two disk images and one mount point.
-    if (argc < 4) {
-        fprintf(stderr, "Error: Too few arguments\n");
-        fprintf(stderr, "%s", usage);
-        return 1;
-    }
+    raid_mode = 1;
 
-    // Check for RAID argument passed during mkfs
-    if (strcmp(argv[1], "-r") != 0) {
-        fprintf(stderr, "Error: No RAID mode specified.\n");
-        return -1;
-    }
-
-    // Determine RAID mode (0, 1, or 1v)
-    raid_mode = -1;
-    if (strcmp(argv[2], "0") == 0) {
-        raid_mode = 0;
-    } else if (strcmp(argv[2], "1") == 0) {
-        raid_mode = 1;
-    } else if (strcmp(argv[2], "1v") == 0) {
-        raid_mode = 2;
-    } else {
-        fprintf(stderr, "Error: Invalid RAID mode.\n");
-        return -1;
-    }
-
-    // Parse the disk images from argv (starting from argv[3] onwards)
-    int num_disks = 0;
+    num_disks = 0;
     while (argv[3 + num_disks] && argv[3 + num_disks][0] != '-') {
         num_disks++;
     }
-
-    // At least two disks are required
-    if (num_disks < 2) {
-        fprintf(stderr, "Error: Not enough disks. At least two disks are required.\n");
-        return -1;
-    }
-
-    // // The last argument is the mount point
-    // const char *mount_point = argv[3 + num_disks];
     
     // Set up disk images (i.e., the array of paths to disk images)
     for (int i = 0; i < num_disks; i++) {
         disk_images[i] = argv[3 + i];
     }
-
-    // // Initialize FUSE options
-    // struct fuse_operations ops = {
-    //     .getattr = wfs_getattr,
-    //     .mknod = wfs_mknod,
-    //     .mkdir = wfs_mkdir,
-    //     .unlink = wfs_unlink,
-    //     .rmdir = wfs_rmdir,
-    //     .read = wfs_read,
-    //     .write = wfs_write,
-    //     .readdir = wfs_readdir,
-    // };
 
     // Set up FUSE arguments (remove disk images and RAID argument, keep the rest)
     char *fuse_args[argc - num_disks - 2];
