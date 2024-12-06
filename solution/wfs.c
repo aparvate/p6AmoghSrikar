@@ -19,13 +19,16 @@ struct wfs_inode *locate_inode(const char *path) {
   struct wfs_sb *superblock = (struct wfs_sb *)disk_images[0];
   struct wfs_inode *inode_table = (struct wfs_inode *)((char *)disk_images[0] + superblock->i_blocks_ptr);
   size_t num_inodes = superblock->num_inodes;
+  printf("Superblock set, table set, num_inodes set\n");
 
   for (size_t i = 0; i < num_inodes; i++) {
     struct wfs_inode *inode = &inode_table[i];
+    printf("inode: %d \n", i);
     if (inode->nlinks > 0) {
       struct wfs_dentry *dentry_table = (struct wfs_dentry *)((char *)disk_images[0] + inode->blocks[0]);
       for (size_t j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
         if (strcmp(dentry_table[j].name, path) == 0) {
+          printf("Found path\n");
           return inode;
         }
       }
@@ -36,7 +39,9 @@ struct wfs_inode *locate_inode(const char *path) {
 }
 
 static int wfs_getattr(const char *path, struct stat *stbuf) {
+  printf("Get attribute starting\n");
   memset(stbuf, 0, sizeof(struct stat));
+  printf("Memory set\n");
 
   if (strcmp(path, "/") == 0) {
     // Root directory
@@ -47,7 +52,9 @@ static int wfs_getattr(const char *path, struct stat *stbuf) {
 
   // Locate the file or directory in the inode table
   struct wfs_inode *inode = locate_inode(path);
+  printf("Found INODE\n");
   if (!inode) {
+    printf("No INODE!\n");
     return -ENOENT;
   }
 
@@ -60,6 +67,7 @@ static int wfs_getattr(const char *path, struct stat *stbuf) {
   stbuf->st_atime = inode->atim;
   stbuf->st_mtime = inode->mtim;
   stbuf->st_ctime = inode->ctim;
+  printf("Stat populated\n");
 
   return 0;
 }
@@ -73,18 +81,21 @@ int wfs_mkdir(const char *path, mode_t mode) {
     struct wfs_sb *superblock = (struct wfs_sb *)disk_images[0];
     struct wfs_inode *inode_table = (struct wfs_inode *)((char *)disk_images[0] + superblock->i_blocks_ptr);
     size_t num_inodes = superblock->num_inodes;
+    printf("Superblock set, table set, num_inodes set\n");
 
     // Find a free inode
     struct wfs_inode *new_inode = NULL;
     for (size_t i = 0; i < num_inodes; i++) {
-        if (inode_table[i].nlinks == 0) {
-            new_inode = &inode_table[i];
-            break;
-        }
+      printf("inode: %d \n", i);
+      if (inode_table[i].nlinks == 0) {
+        new_inode = &inode_table[i];
+        break;
+      }
     }
 
     if (!new_inode) {
-        return -ENOSPC;
+      printf("No INODE\n");
+      return -ENOSPC;
     }
 
     // Initialize the new inode
@@ -100,17 +111,20 @@ int wfs_mkdir(const char *path, mode_t mode) {
     // Find a free directory entry
     struct wfs_inode *parent_inode = locate_inode("/"); // Assuming root for simplicity
     if (!parent_inode) {
-        return -ENOENT;
+      printf("Root INODE not found");
+      return -ENOENT;
     }
 
     struct wfs_dentry *dentry_table = (struct wfs_dentry *)((char *)disk_images[0] + parent_inode->blocks[0]);
     for (size_t i = 0; i < BLOCK_SIZE / sizeof(struct wfs_dentry); i++) {
-        if (dentry_table[i].num == 0) {
-            strncpy(dentry_table[i].name, path, MAX_NAME);
-            dentry_table[i].num = new_inode - inode_table; // Index of the new inode
-            parent_inode->nlinks++;
-            return 0;
-        }
+      printf("dentry: %d \n", i);
+      if (dentry_table[i].num == 0) {
+        printf("Creating new directory");
+        strncpy(dentry_table[i].name, path, MAX_NAME);
+        dentry_table[i].num = new_inode - inode_table; // Index of the new inode
+        parent_inode->nlinks++;
+        return 0;
+      }
     }
 
     return -ENOSPC;
@@ -153,58 +167,57 @@ static struct fuse_operations ops = {
 };
 
 int main(int argc, char *argv[]) {
-    if (argc < 3) {
-        fprintf(stderr, "Usage: %s <disk1> <disk2> ... <mount_point> [FUSE options]\n", argv[0]);
-        return -1;
-    }
+  if (argc < 3) {
+    return -1;
+  }
 
-    printf("ARGV ORIGINALLY\n");
-    for (int i = 0; i < argc; i++) {
-        printf("  argv[%d]: %s\n", i, argv[i]);
-    }
+  printf("Hawk Tuah!\n");
+  for (int i = 0; i < argc; i++) {
+    printf("  argv[%d]: %s\n", i, argv[i]);
+  }
 
-    // Identify disk image arguments
-    num_disks = 0;
-    while (num_disks + 1 < argc && argv[num_disks + 1][0] != '-') {
-        num_disks++;
-    }
+  // Identify disk image arguments
+  num_disks = 0;
+  while (num_disks + 1 < argc && argv[num_disks + 1][0] != '-') {
+    num_disks++;
+  }
 
-    if (num_disks < 2) {
-        fprintf(stderr, "Error: At least two disk images are required.\n");
-        return -1;
-    }
+  if (num_disks < 2) {
+    fprintf(stderr, "Error: At least two disk images are required.\n");
+    return -1;
+  }
 
-    // Debug: Print disk images
-    printf("Disk images:\n");
-    for (int i = 0; i < num_disks; i++) {
-        printf("  Disk %d: %s\n", i + 1, argv[i + 1]);
-    }
+  // Debug: Print disk images
+  printf("Disk images:\n");
+  for (int i = 0; i < num_disks; i++) {
+    printf("  Disk %d: %s\n", i + 1, argv[i + 1]);
+  }
 
-    // Create a new array for FUSE arguments
-    int fuse_argc = argc - num_disks - 1; // Exclude disk images and argv[0]
-    char **fuse_argv = malloc(fuse_argc * sizeof(char *));
-    if (!fuse_argv) {
-        perror("Error allocating memory for FUSE arguments");
-        return -1;
-    }
+  // Create a new array for FUSE arguments
+  int fuse_argc = argc - num_disks - 1; // Exclude disk images and argv[0]
+  char **fuse_argv = malloc(fuse_argc * sizeof(char *));
+  if (!fuse_argv) {
+    perror("Error allocating memory for FUSE arguments");
+    return -1;
+  }
 
-    // Copy FUSE-related arguments to fuse_argv (skip argv[0] and disk image paths)
-    for (int i = num_disks + 1; i < argc; i++) {
-        fuse_argv[i - num_disks - 1] = argv[i];
-    }
+  // Copy FUSE-related arguments to fuse_argv (skip argv[0] and disk image paths)
+  for (int i = num_disks + 1; i < argc; i++) {
+    fuse_argv[i - num_disks - 1] = argv[i];
+  }
 
-    // Debug: Print updated argc and argv for FUSE
-    printf("FUSE argc: %d\n", fuse_argc);
-    printf("FUSE argv:\n");
-    for (int i = 0; i < fuse_argc; i++) {
-        printf("  argv[%d]: %s\n", i, fuse_argv[i]);
-    }
+  // Debug: Print updated argc and argv for FUSE
+  printf("FUSE argc: %d\n", fuse_argc);
+  printf("FUSE argv:\n");
+  for (int i = 0; i < fuse_argc; i++) {
+    printf("  argv[%d]: %s\n", i, fuse_argv[i]);
+  }
 
-    // Start FUSE
-    int result = fuse_main(fuse_argc, fuse_argv, &ops, NULL);
+  // Start FUSE
+  int result = fuse_main(fuse_argc, fuse_argv, &ops, NULL);
 
-    // Free allocated memory
-    free(fuse_argv);
+  // Free allocated memory
+  free(fuse_argv);
 
-    return result;
+  return result;
 }
