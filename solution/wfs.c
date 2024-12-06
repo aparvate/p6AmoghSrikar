@@ -157,6 +157,7 @@ int wfs_mkdir(const char *path, mode_t mode) {
   new_inode->atim = time(NULL);
   new_inode->mtim = time(NULL);
   new_inode->ctim = time(NULL);
+  new_inode->num = 12
 
   // Find a free directory entry
   struct wfs_inode *parent_inode = locate_inode("/");
@@ -171,8 +172,7 @@ int wfs_mkdir(const char *path, mode_t mode) {
     if (dentry_table[i].num == 0) {
       printf("Creating new directory");
       strncpy(dentry_table[i].name, path, MAX_NAME);
-      dentry_table[i].num = new_inode - inode_table; // Index of the new inode
-      new_inode->num = dentry_table[i].num;
+      dentry_table[i].num = new_inode->num;
       parent_inode->nlinks++;
       return 0;
     }
@@ -205,6 +205,17 @@ static int wfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_
   printf("readdir called for path: %s\n", path);
   return 0;
 }
+
+static struct fuse_operations ops = {
+  .getattr = wfs_getattr,
+  .mknod   = wfs_mknod,
+  .mkdir   = wfs_mkdir,
+  .unlink  = wfs_unlink,
+  .rmdir   = wfs_rmdir,
+  .read    = wfs_read,
+  .write   = wfs_write,
+  .readdir = wfs_readdir,
+};
 
 int main(int argc, char *argv[]) {
   if (argc < 3) {
@@ -254,17 +265,6 @@ int main(int argc, char *argv[]) {
     printf("  argv[%d]: %s\n", i, fuse_argv[i]);
   }
   fuse_argc = fuse_argc - 1;
-
-  static struct fuse_operations ops = {
-    .getattr = wfs_getattr,
-    .mknod   = wfs_mknod,
-    .mkdir   = wfs_mkdir,
-    .unlink  = wfs_unlink,
-    .rmdir   = wfs_rmdir,
-    .read    = wfs_read,
-    .write   = wfs_write,
-    .readdir = wfs_readdir,
-  };
 
   // Start FUSE
   int result = fuse_main(fuse_argc, fuse_argv, &ops, NULL);
