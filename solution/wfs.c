@@ -219,7 +219,7 @@ int main(int argc, char *argv[]) {
   printf("Fuse main passed\n");
 
   // Free allocated memory
-  free(fuse_argv);
+  //free(fuse_argv);
   printf("Args freed\n");
 
   return result;
