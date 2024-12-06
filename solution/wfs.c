@@ -288,7 +288,7 @@ int main(int argc, char *argv[]) {
   // Debug: Print updated argc and argv for FUSE
   printf("FUSE argc: %d\n", fuse_argc);
   printf("FUSE argv:\n");
-  for (int i = 0; i < fuse_argc-1; i++) {
+  for (int i = 0; i < fuse_argc; i++) {
     printf("  argv[%d]: %s\n", i, fuse_argv[i]);
   }
   //fuse_argc = fuse_argc - 1;
