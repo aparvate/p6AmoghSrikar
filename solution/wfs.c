@@ -158,7 +158,7 @@ int main(int argc, char *argv[]) {
     printf("Hawk Tuah!\n");
 
     num_disks = 0;
-    while (argv[num_disks] && (argv[num_disks][0] != '-' || strcmp ("./wfs", argv[num_disks]))) {
+    while (argv[num_disks] && argv[num_disks][0] != '-') {
       printf("NumDisks: %d \n", num_disks);
       printf("What is the argument: %s \n", argv[num_disks]);
       printf("What is the first character: %c \n", argv[num_disks][0]);
