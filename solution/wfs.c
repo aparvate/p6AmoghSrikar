@@ -16,6 +16,11 @@ char *disks[10];
 void *disk_images[10];
 
 struct wfs_inode *locate_inode(const char *path) {
+  if (strcmp("/", path) == 0) {
+    printf("Found path\n");
+    return 0;
+  }
+
   struct wfs_sb *superblock = (struct wfs_sb *)disk_images[0];
   struct wfs_inode *inode_table = (struct wfs_inode *)((char *)disk_images[0] + superblock->i_blocks_ptr);
   size_t num_inodes = superblock->num_inodes;
