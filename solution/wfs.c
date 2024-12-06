@@ -152,8 +152,6 @@ static struct fuse_operations ops = {
   .readdir = wfs_readdir,
 };
 
-static const char *usage = "Usage: ./wfs disk1 disk2 [FUSE options] mount_point\n";
-
 int main(int argc, char *argv[]) {
     raid_mode = 1;
 
