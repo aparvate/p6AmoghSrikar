@@ -195,31 +195,32 @@ int main(int argc, char *argv[]) {
   }
 
   // Create a new array for FUSE arguments
-  // int fuse_argc = argc - num_disks - 1; // Exclude disk images and argv[0]
-  // char **fuse_argv = malloc(fuse_argc * sizeof(char *));
-  // if (!fuse_argv) {
-  //   perror("Error allocating memory for FUSE arguments");
-  //   return -1;
-  // }
+  int fuse_argc = argc - num_disks; // Exclude disk images and argv[0]
+  char **fuse_argv = malloc(fuse_argc * sizeof(char *));
+  if (!fuse_argv) {
+    perror("Error allocating memory for FUSE arguments");
+    return -1;
+  }
 
   // Copy FUSE-related arguments to fuse_argv (skip argv[0] and disk image paths)
-  // for (int i = num_disks + 1; i < argc; i++) {
-  //   fuse_argv[i - num_disks - 1] = argv[i];
-  // }
+  fuse_argv[0] = './wfs';
+  for (int i = num_disks + 1; i < argc; i++) {
+    fuse_argv[i - num_disks] = argv[i];
+  }
 
   // Debug: Print updated argc and argv for FUSE
-  // printf("FUSE argc: %d\n", fuse_argc);
-  // printf("FUSE argv:\n");
-  // for (int i = 0; i < fuse_argc; i++) {
-  //   printf("  argv[%d]: %s\n", i, fuse_argv[i]);
-  // }
+  printf("FUSE argc: %d\n", fuse_argc);
+  printf("FUSE argv:\n");
+  for (int i = 0; i < fuse_argc; i++) {
+    printf("  argv[%d]: %s\n", i, fuse_argv[i]);
+  }
 
   // Start FUSE
-  int result = fuse_main(argc, argv, &ops, NULL);
+  int result = fuse_main(fuse_argc, fuse_argv, &ops, NULL);
   printf("Fuse main passed\n");
 
   // Free allocated memory
-  //free(fuse_argv);
+  free(fuse_argv);
   printf("Args freed\n");
 
   return result;
