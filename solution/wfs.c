@@ -34,7 +34,6 @@ off_t allocate_DB() {
   struct wfs_sb *superblock = (struct wfs_sb *)disk_images[0];
   off_t num = allocate_block((uint32_t *)((char *)disk_images[0] + superblock->d_bitmap_ptr), superblock->num_data_blocks / 32);
   if (num < 0) {
-    err = -ENOSPC;  
     return -1;
   }
   return superblock->d_blocks_ptr + BLOCK_SIZE * num;
@@ -44,10 +43,9 @@ struct wfs_inode *allocate_inode() {
   struct wfs_sb *superblock = (struct wfs_sb *)disk_images[0];
   off_t num = allocate_block((uint32_t *)((char *)disk_images[0] + superblock->d_bitmap_ptr), superblock->num_inodes / 32);
   if (num < 0) {
-    err = -ENOSPC;
     return NULL;
   }
-  struct wfs_inode *inode = (struct wfs_inode *)((char *)mmap_ptr(superblock->i_blocks_ptr) + num * BLOCK_SIZE);
+  struct wfs_inode *inode = (struct wfs_inode *)(((char *)disk_images[0] + superblock->d_bitmap_ptr) + num * BLOCK_SIZE);
   inode->num = num;
   return inode;
 }
@@ -165,8 +163,8 @@ static int wfs_mknod(const char *path, mode_t mode, dev_t dev) {
 int wfs_mkdir(const char *path, mode_t mode) {
   printf("Starting mkdir\n");
   struct wfs_sb *superblock = (struct wfs_sb *)disk_images[0];
-  struct wfs_inode *inode_table = (struct wfs_inode *)((char *)disk_images[0] + superblock->i_blocks_ptr);
-  size_t num_inodes = superblock->num_inodes;
+  //struct wfs_inode *inode_table = (struct wfs_inode *)((char *)disk_images[0] + superblock->i_blocks_ptr);
+  //size_t num_inodes = superblock->num_inodes;
   printf("Superblock set, table set, num_inodes set\n");
 
   // Find a free inode
