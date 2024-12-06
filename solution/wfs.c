@@ -169,7 +169,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Determine RAID mode (0, 1, or 1v)
-    int raid_mode = -1;
+    raid_mode = -1;
     if (strcmp(argv[2], "0") == 0) {
         raid_mode = 0;
     } else if (strcmp(argv[2], "1") == 0) {
@@ -193,26 +193,26 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    // The last argument is the mount point
-    const char *mount_point = argv[3 + num_disks];
+    // // The last argument is the mount point
+    // const char *mount_point = argv[3 + num_disks];
     
     // Set up disk images (i.e., the array of paths to disk images)
-    char *disk_images[num_disks];
+    *disk_images[num_disks];
     for (int i = 0; i < num_disks; i++) {
         disk_images[i] = argv[3 + i];
     }
 
-    // Initialize FUSE options
-    struct fuse_operations ops = {
-        .getattr = wfs_getattr,
-        .mknod = wfs_mknod,
-        .mkdir = wfs_mkdir,
-        .unlink = wfs_unlink,
-        .rmdir = wfs_rmdir,
-        .read = wfs_read,
-        .write = wfs_write,
-        .readdir = wfs_readdir,
-    };
+    // // Initialize FUSE options
+    // struct fuse_operations ops = {
+    //     .getattr = wfs_getattr,
+    //     .mknod = wfs_mknod,
+    //     .mkdir = wfs_mkdir,
+    //     .unlink = wfs_unlink,
+    //     .rmdir = wfs_rmdir,
+    //     .read = wfs_read,
+    //     .write = wfs_write,
+    //     .readdir = wfs_readdir,
+    // };
 
     // Set up FUSE arguments (remove disk images and RAID argument, keep the rest)
     char *fuse_args[argc - num_disks - 2];
