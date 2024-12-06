@@ -153,38 +153,58 @@ static struct fuse_operations ops = {
 };
 
 int main(int argc, char *argv[]) {
-    raid_mode = 1;
+    if (argc < 3) {
+        fprintf(stderr, "Usage: %s <disk1> <disk2> ... <mount_point> [FUSE options]\n", argv[0]);
+        return -1;
+    }
 
-    printf("Hawk Tuah!\n");
+    printf("ARGV ORIGINALLY\n");
+    for (int i = 0; i < argc; i++) {
+        printf("  argv[%d]: %s\n", i, argv[i]);
+    }
 
+    // Identify disk image arguments
     num_disks = 0;
-    while (argv[num_disks] && argv[num_disks][0] != '-') {
-      printf("NumDisks: %d \n", num_disks);
-      printf("What is the argument: %s \n", argv[num_disks]);
-      printf("What is the first character: %c \n", argv[num_disks][0]);
-      num_disks++;
+    while (num_disks + 1 < argc && argv[num_disks + 1][0] != '-') {
+        num_disks++;
     }
-    
-    // Set up disk images (i.e., the array of paths to disk images)
+
+    if (num_disks < 2) {
+        fprintf(stderr, "Error: At least two disk images are required.\n");
+        return -1;
+    }
+
+    // Debug: Print disk images
+    printf("Disk images:\n");
     for (int i = 0; i < num_disks; i++) {
-      printf("Arg %d: %s \n", i, argv[3 + i]);
-      disk_images[i] = argv[3 + i];
+        printf("  Disk %d: %s\n", i + 1, argv[i + 1]);
     }
 
-    // Set up FUSE arguments (remove disk images and RAID argument, keep the rest)
-    char *fuse_args[argc - num_disks - 2];
-    int fuse_arg_count = 0;
-
-    int i = 1 + num_disks;
-    while (i < argc - 1 && argv[i]) {
-      fuse_args[fuse_arg_count++] = argv[i];
-      i++;
+    // Create a new array for FUSE arguments
+    int fuse_argc = argc - num_disks - 1; // Exclude disk images and argv[0]
+    char **fuse_argv = malloc(fuse_argc * sizeof(char *));
+    if (!fuse_argv) {
+        perror("Error allocating memory for FUSE arguments");
+        return -1;
     }
-    fuse_args[fuse_arg_count] = NULL;  // Null-terminate the arguments
 
-    // Initialize the filesystem by calling fuse_main
-    // This will mount the filesystem and enter the FUSE loop
-    int ret = fuse_main(fuse_arg_count, fuse_args, &ops, NULL);
+    // Copy FUSE-related arguments to fuse_argv (skip argv[0] and disk image paths)
+    for (int i = num_disks + 1; i < argc; i++) {
+        fuse_argv[i - num_disks - 1] = argv[i];
+    }
 
-    return ret;
+    // Debug: Print updated argc and argv for FUSE
+    printf("FUSE argc: %d\n", fuse_argc);
+    printf("FUSE argv:\n");
+    for (int i = 0; i < fuse_argc; i++) {
+        printf("  argv[%d]: %s\n", i, fuse_argv[i]);
+    }
+
+    // Start FUSE
+    int result = fuse_main(fuse_argc, fuse_argv, &ops, NULL);
+
+    // Free allocated memory
+    free(fuse_argv);
+
+    return result;
 }
