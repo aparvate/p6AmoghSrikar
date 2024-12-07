@@ -66,7 +66,7 @@ int wfs_mknod(const char *path, mode_t mode, dev_t dev) {
         free(file);
         return -ENOSPC;  
     }
-    inode->mode = __S_IFREG | mode;
+    inode->mode = S_IFREG | mode;
     inode->uid = getuid();
     inode->gid = getgid();
     inode->size = 0;
@@ -127,7 +127,7 @@ int wfs_mkdir(const char *path, mode_t mode) {
         free(file);
         return -ENOSPC;
     }
-    inode->mode = __S_IFDIR | mode;
+    inode->mode = S_IFDIR | mode;
     inode->uid = getuid();
     inode->gid = getgid();
     inode->size = 0;
