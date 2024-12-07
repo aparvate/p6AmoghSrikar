@@ -10,10 +10,6 @@
 #include <time.h>
 #include "wfs.h"
 
-// struct wfsSbExtended {
-//     struct wfs_sb base;
-// } __attribute__((packed));
-
 void freeFunc(int* fds, void** diskMapStore){
     free(fds);
     free(diskMapStore);
