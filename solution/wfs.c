@@ -23,7 +23,7 @@ int get_inode_path(char *path, struct wfs_inode **inode);
 int wfs_mknod(const char *path, mode_t mode, dev_t dev);
 int wfs_mkdir(const char *path, mode_t mode);
 int wfs_getattr(const char *path, struct stat *stbuf);
-int wfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi);
+int wfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset);
 int wfs_unlink(const char *path);
 int wfs_rmdir(const char *path);
 int wfs_read(const char *path, char *buf, size_t size, off_t offset);
@@ -261,7 +261,7 @@ void update_size(struct wfs_inode *inode, off_t offset, size_t size) {
     }
 }
 
-int wfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi){
+int wfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset){
     (void)fi;
     (void)offset;
     filler(buf, ".", NULL, 0);
