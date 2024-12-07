@@ -138,6 +138,7 @@ int main(int argc, char *argv[]) {
         root.atim = time(NULL);
         root.mtim = time(NULL);
         root.ctim = time(NULL);
+        root.num = 0;
         memcpy((char*)diskMapStore[i] + iStart, &root, sizeof(root));
 
         msync(diskMapStore[i], fsSize, MS_SYNC);
