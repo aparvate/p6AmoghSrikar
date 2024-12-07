@@ -26,8 +26,8 @@ int wfs_getattr(const char *path, struct stat *stbuf);
 int wfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi);
 int wfs_unlink(const char *path);
 int wfs_rmdir(const char *path);
-int wfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi);
-int wfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi);
+int wfs_read(const char *path, char *buf, size_t size, off_t offset);
+int wfs_write(const char *path, const char *buf, size_t size, off_t offset);
 
 char *find_offset(struct wfs_inode *inode, off_t off, int flag);
 struct wfs_inode *find_inode(int num);
@@ -45,15 +45,16 @@ void update_size(struct wfs_inode *inode, off_t offset, size_t size);
 char* mmap_ptr(off_t offset);
 
 static struct fuse_operations ops = {
-    .getattr = wfs_getattr,
-    .mknod = wfs_mknod,
-    .mkdir = wfs_mkdir,
-    .unlink = wfs_unlink,
-    .rmdir = wfs_rmdir,
-    .read = wfs_read,
-    .write = wfs_write,
-    .readdir = wfs_readdir,
+  .getattr = wfs_getattr,
+  .mknod   = wfs_mknod,
+  .mkdir   = wfs_mkdir,
+  .unlink  = wfs_unlink,
+  .rmdir   = wfs_rmdir,
+  .read    = wfs_read,
+  .write   = wfs_write,
+  .readdir = wfs_readdir,
 };
+
 
 int wfs_mknod(const char *path, mode_t mode, dev_t dev) {
     (void)dev; 
@@ -197,7 +198,7 @@ void change(struct stat *stbuf, struct wfs_inode *inode) {
 }
 
 
-int wfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi){
+int wfs_read(const char *path, char *buf, size_t size, off_t offset){
     (void)fi;
     struct wfs_inode *inode;
     char *search = strdup(path);
@@ -227,7 +228,7 @@ int wfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse
     return read;
 }
 
-int wfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi){
+int wfs_write(const char *path, const char *buf, size_t size, off_t offset){
     (void)fi;
     struct wfs_inode *inode;
     char *search = strdup(path);
