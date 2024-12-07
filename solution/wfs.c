@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include "wfs.h"
+#include <libgen.h>
 
 int num_disks;
 int raid_mode;
@@ -209,8 +210,8 @@ static int wfs_mknod(const char *path, mode_t mode, dev_t dev) {
 }
 
 static int wfs_mkdir(const char *path, mode_t mode) {
-    int check = locate_inode(path);
-    if (check >= 0) return -EEXIST;
+    struct wfs_inode* check = locate_inode(path);
+    if (!check) return -EEXIST;
 
     printf("Starting mkdir\n");
     struct wfs_sb *superblock = (struct wfs_sb *)disk_images[0];
@@ -226,14 +227,14 @@ static int wfs_mkdir(const char *path, mode_t mode) {
     char *dir_name = basename(dir_copy);
     char *parent_path = dirname(path_copy);
     
-    int parent_inode_num = locate_inode(parent_path);
-    if (parent_inode_num < 0) return -ENOENT; // Parent directory not found
+    struct wfs_inode* parent_inode_num = locate_inode(parent_path);
+    if (!parent_inode_num) return -ENOENT; // Parent directory not found
 
     int new_inode_num;
     for (size_t i = 0; i < num_inodes; i++) {
       printf("inode: %zd \n", i);
       if (inode_table[i].nlinks == 0) {
-        new_inode_num = &inode_table[i];
+        new_inode_num = &inode_table[i]->num;
         break;
       }
     }
@@ -249,14 +250,14 @@ static int wfs_mkdir(const char *path, mode_t mode) {
     new_dir.atim = new_dir.mtim = new_dir.ctim = time(NULL);
     
     struct wfs_inode parent = {0};
-    memcpy(&parent, find_inode_from_num(parent_inode_num), sizeof(struct wfs_inode));
+    memcpy(&parent, parent_inode_num, sizeof(struct wfs_inode));
     
     if (parent.blocks[0] == 0 && parent.size == 0) {
         int block_num = allocate_DB();
-        if (block_num < 0) {
-            free_inode(new_inode_num);
-            return -ENOSPC;
-        }
+        // if (block_num < 0) {
+        //     free_inode(new_inode_num);
+        //     return -ENOSPC;
+        // }
         parent.blocks[0] = block_num;
         
         char zero_block[BLOCK_SIZE] = {0};
@@ -277,7 +278,7 @@ static int wfs_mkdir(const char *path, mode_t mode) {
         memcpy((char*)disk_images[disk] + superblock->i_blocks_ptr + new_inode_num * BLOCK_SIZE,
                &new_dir, sizeof(struct wfs_inode));
                
-        memcpy((char*)disk_images[disk] + superblock->i_blocks_ptr + parent_inode_num * BLOCK_SIZE,
+        memcpy((char*)disk_images[disk] + superblock->i_blocks_ptr + parent_inode_num->num * BLOCK_SIZE,
                &parent, sizeof(struct wfs_inode));
                
         memcpy((char*)disk_images[disk] + superblock->d_blocks_ptr + parent.blocks[0] * BLOCK_SIZE + parent.size - sizeof(struct wfs_dentry),
