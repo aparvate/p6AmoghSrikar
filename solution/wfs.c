@@ -95,41 +95,35 @@ struct wfs_inode *locate_inode(const char *path) {
   return current_inode;
 }
 
-struct wfs_inode *locate_inode(const char *path) {
-  if (strcmp("/", path) == 0) {
-    printf("Found root path\n");
-    struct wfs_sb *superblock = (struct wfs_sb *)disk_images[0];
-    struct wfs_inode *inode_table = (struct wfs_inode *)((char *)disk_images[0] + superblock->i_blocks_ptr);
-    return &inode_table[0]; // Return the root inode
-  }
+struct wfs_inode *find_inode_from_num (int num) {
 
-  char path_copy[strlen(path) + 1];
-  strcpy(path_copy, path);
+    printf("find inode from num starting\n");
 
-  char *token = strtok(path_copy, "/");
-  struct wfs_inode *current_inode = find_inode_from_num(0); // Start at the root inode
+    struct wfs_sb *superblock = (struct wfs_sb *) disk_images[0];
+    printf("checkpoint 1\n");
+    int bits = 32;
 
-  while (token) {
-    struct wfs_dentry *dentry_table = (struct wfs_dentry *)((char *)disk_images[0] + current_inode->blocks[0]);
+    // Access the inode bitmap directly using the offset
+    uint32_t *inode_bitmap = (uint32_t *)((char *) disk_images[0] + superblock->i_bitmap_ptr);
 
-    int found = 0;
-    for (size_t i = 0; i < BLOCK_SIZE / sizeof(struct wfs_dentry); i++) {
-      if (dentry_table[i].num > 0 && strcmp(dentry_table[i].name, token) == 0) {
-        current_inode = find_inode_from_num(dentry_table[i].num);
-        found = 1;
-        break;
-      }
+    printf("checkpoint 2\n");
+
+    int bit_idx = num % bits;
+    int array_idx = num / bits;
+
+    printf("checkpoint 3\n");
+
+    if (!(inode_bitmap[array_idx] & (0x1 << bit_idx))) {
+        printf("checkpoint 4\n");
+        return NULL;
     }
 
-    if (!found) {
-      printf("Component '%s' not found.\n", token);
-      return NULL;
-    }
+    printf("checkpoint 5\n");
 
-    token = strtok(NULL, "/");
-  }
-
-  return current_inode;
+    char *inode_table = ((char *) disk_images[0]) + superblock->i_blocks_ptr;
+    printf("checkpoint 6\n");
+    printf("find inode from num finished\n");
+    return (struct wfs_inode *)((num * BLOCK_SIZE) + inode_table);
 }
 
 static int wfs_getattr(const char *path, struct stat *stbuf) {
