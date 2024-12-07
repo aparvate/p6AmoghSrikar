@@ -234,7 +234,7 @@ static int wfs_mkdir(const char *path, mode_t mode) {
     for (size_t i = 0; i < num_inodes; i++) {
       printf("inode: %zd \n", i);
       if (inode_table[i].nlinks == 0) {
-        new_inode_num = &inode_table[i]->num;
+        new_inode_num = i;
         break;
       }
     }
