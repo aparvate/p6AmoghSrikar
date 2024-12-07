@@ -131,36 +131,50 @@ static int wfs_getattr(const char *path, struct stat *stbuf) {
 
 static int wfs_mknod(const char *path, mode_t mode, dev_t dev) {
   printf("Starting mknod\n");
-  // struct wfs_sb *superblock = (struct wfs_sb *)disk_images[0];
-  // struct wfs_inode *inode_table = (struct wfs_inode *)((char *)disk_images[0] + superblock->i_blocks_ptr);
-  // size_t num_inodes = superblock->num_inodes;
-  // printf("Superblock set, table set, num_inodes set\n");
+  //struct wfs_sb *superblock = (struct wfs_sb *)disk_images[0];
+  //struct wfs_inode *inode_table = (struct wfs_inode *)((char *)disk_images[0] + superblock->i_blocks_ptr);
+  //size_t num_inodes = superblock->num_inodes;
 
-  // struct wfs_inode *new_inode = NULL;
-  // for (size_t i = 0; i < num_inodes; i++) {
-  //   printf("inode: %zd \n", i);
-  //   if (inode_table[i].nlinks == 0) {
-  //     new_inode = &inode_table[i];
-  //     break;
-  //   }
-  // }
+  // Find a free inode
+  printf("Allocating node\n");
+  struct wfs_inode *new_inode = allocate_inode();
 
-  // if (!new_inode) {
-  //   printf("No INODE\n");
-  //   return -ENOSPC;
-  // }
-  // // Initialize the new inode
-  // memset(new_inode, 0, sizeof(struct wfs_inode));
-  // new_inode->mode = S_IFDIR | mode;
-  // new_inode->uid = getuid();
-  // new_inode->gid = getgid();
-  // new_inode->nlinks = 2;
-  // new_inode->atim = time(NULL);
-  // new_inode->mtim = time(NULL);
-  // new_inode->ctim = time(NULL);
+  if (!new_inode) {
+    printf("No INODE\n");
+    return -ENOSPC;
+  }
 
-  // printf("mknod called for path: %s\n", path);
-  return 0;
+  // Initialize the new inode
+  memset(new_inode, 0, sizeof(struct wfs_inode));
+  new_inode->mode = S_IFDIR | mode;
+  new_inode->uid = getuid();
+  new_inode->gid = getgid();
+  new_inode->nlinks = 2;
+  new_inode->atim = time(NULL);
+  new_inode->mtim = time(NULL);
+  new_inode->ctim = time(NULL);
+  new_inode->num = 12;
+
+  // Find a free directory entry
+  struct wfs_inode *parent_inode = locate_inode("/");
+  if (!parent_inode) {
+    printf("Root INODE not found");
+    return -ENOENT;
+  }
+
+  struct wfs_dentry *dentry_table = (struct wfs_dentry *)((char *)disk_images[0] + parent_inode->blocks[0]);
+  for (size_t i = 0; i < BLOCK_SIZE / sizeof(struct wfs_dentry); i++) {
+    printf("dentry: %zd \n", i);
+    if (dentry_table[i].num == 0) {
+      printf("Creating new directory");
+      strncpy(dentry_table[i].name, path, MAX_NAME);
+      dentry_table[i].num = new_inode->num;
+      parent_inode->nlinks++;
+      return 0;
+    }
+  }
+
+  return -ENOSPC;
 }
 
 int wfs_mkdir(const char *path, mode_t mode) {
