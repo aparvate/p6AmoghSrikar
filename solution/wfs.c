@@ -44,17 +44,6 @@ void change(struct stat *stbuf, struct wfs_inode *inode);
 void update_size(struct wfs_inode *inode, off_t offset, size_t size);
 char* mmap_ptr(off_t offset);
 
-static struct fuse_operations ops = {
-  .getattr = wfs_getattr,
-  .mknod = wfs_mknod,
-  .mkdir = wfs_mkdir,
-  .unlink = wfs_unlink,
-  .rmdir = wfs_rmdir,
-  .read = wfs_read,
-  .write = wfs_write,
-  .readdir = wfs_readdir,
-};
-
 int wfs_mknod(const char *path, mode_t mode, dev_t dev) {
     (void)dev; 
     struct wfs_inode *parent = NULL;
@@ -456,6 +445,17 @@ int get_inode(struct wfs_inode *enclosing, char *path, struct wfs_inode **inode)
 int get_inode_path(char *path, struct wfs_inode **inode) {
     return get_inode(find_inode(0), path + 1, inode);
 }
+
+static struct fuse_operations ops = {
+  .getattr = wfs_getattr,
+  .mknod = wfs_mknod,
+  .mkdir = wfs_mkdir,
+  .unlink = wfs_unlink,
+  .rmdir = wfs_rmdir,
+  .read = wfs_read,
+  .write = wfs_write,
+  .readdir = wfs_readdir,
+};
 
 int main(int argc, char *argv[]) {
     int status;
