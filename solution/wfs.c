@@ -337,39 +337,39 @@ int main(int argc, char *argv[]) {
   
   if (num_disks < 1) {
     fprintf(stderr, "Need at least 1 disks\n");
-    return FAIL;
+    return -1;
   }
 
   disks = malloc(sizeof(void *) * num_disks);
   if (disks == NULL) {
     fprintf(stderr, "Memory allocation failed for disks\n");
-    return FAIL;
+    return -1;
   }
 
   fileDescs = malloc(sizeof(int) * num_disks);
   if (fileDescs == NULL) {
     fprintf(stderr, "Memory allocation failed for fileDescs\n");
-    return FAIL;
+    return -1;
   }
 
   for (int i = 0; i < num_disks; i++) {
     fileDescs[i] = open(argv[i + 1], O_RDWR);
     if (fileDescs[i] == -1) {
       fprintf(stderr, "Failed to open disk %s\n", argv[i + 1]);
-      return FAIL;
+      return -1;
     }
 
     struct stat st;
     if (fstat(fileDescs[i], &st) != 0) {
       fprintf(stderr, "Failed to get disk size for %s\n", argv[i + 1]);
-      return FAIL;
+      return -1;
     }
     diskSize = st.st_size;
 
     disks[i] = mmap(NULL, diskSize, PROT_READ | PROT_WRITE, MAP_SHARED, fileDescs[i], 0);
     if (disks[i] == MAP_FAILED) {
       fprintf(stderr, "Failed to mmap disk %s\n", argv[i + 1]);
-      return FAIL;
+      return -1;
     }
   }
 
@@ -377,7 +377,7 @@ int main(int argc, char *argv[]) {
 
   if (superblock == NULL) {
     fprintf(stderr, "Failed to access superblock\n");
-    return FAIL;
+    return -1;
   }
 
   num_disks = superblock->num_disks;
@@ -397,7 +397,7 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < num_disks; i++) {
     if (munmap(disks[i], diskSize) != 0) {
       fprintf(stderr, "Failed to unmap disk %d\n", i);
-      return FAIL;
+      return -1;
     }
     close(fileDescs[i]);
   }
