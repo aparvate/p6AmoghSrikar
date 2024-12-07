@@ -13,6 +13,7 @@
 
 int num_disks;
 int raid_mode;
+int fileDescs;
 char *disks[10];
 void *disk_images[10];
 
@@ -328,61 +329,81 @@ static struct fuse_operations ops = {
 };
 
 int main(int argc, char *argv[]) {
-  if (argc < 3) {
-    return -1;
-  }
-
-  printf("Hawk Tuah!\n");
-  for (int i = 0; i < argc; i++) {
-    printf("  argv[%d]: %s\n", i, argv[i]);
-  }
-
-  // Identify disk image arguments
   num_disks = 0;
-  while (num_disks + 1 < argc && argv[num_disks + 1][0] != '-') {
+  while (num_disks + 1 < argc && access(argv[num_disks + 1], F_OK) == 0)
+  {
     num_disks++;
   }
-
-  if (num_disks < 2) {
-    fprintf(stderr, "Error: At least two disk images are required.\n");
-    return -1;
+  
+  if (num_disks < 1) {
+    fprintf(stderr, "Need at least 1 disks\n");
+    return FAIL;
   }
 
-  // Debug: Print disk images
-  printf("Disk images:\n");
+  disks = malloc(sizeof(void *) * num_disks);
+  if (disks == NULL) {
+    fprintf(stderr, "Memory allocation failed for disks\n");
+    return FAIL;
+  }
+
+  fileDescs = malloc(sizeof(int) * num_disks);
+  if (fileDescs == NULL) {
+    fprintf(stderr, "Memory allocation failed for fileDescs\n");
+    return FAIL;
+  }
+
   for (int i = 0; i < num_disks; i++) {
-    printf("  Disk %d: %s\n", i + 1, argv[i + 1]);
+    fileDescs[i] = open(argv[i + 1], O_RDWR);
+    if (fileDescs[i] == -1) {
+      fprintf(stderr, "Failed to open disk %s\n", argv[i + 1]);
+      return FAIL;
+    }
+
+    struct stat st;
+    if (fstat(fileDescs[i], &st) != 0) {
+      fprintf(stderr, "Failed to get disk size for %s\n", argv[i + 1]);
+      return FAIL;
+    }
+    diskSize = st.st_size;
+
+    disks[i] = mmap(NULL, diskSize, PROT_READ | PROT_WRITE, MAP_SHARED, fileDescs[i], 0);
+    if (disks[i] == MAP_FAILED) {
+      fprintf(stderr, "Failed to mmap disk %s\n", argv[i + 1]);
+      return FAIL;
+    }
   }
 
-  // Create a new array for FUSE arguments
-  int fuse_argc = argc - num_disks; // Exclude disk images and argv[0], add space for 1 null ending
-  char **fuse_argv = malloc(fuse_argc * sizeof(char *));
-  if (!fuse_argv) {
-    perror("Error allocating memory for FUSE arguments");
-    return -1;
+  superblock = (struct wfs_sb *)disks[0];
+
+  if (superblock == NULL) {
+    fprintf(stderr, "Failed to access superblock\n");
+    return FAIL;
   }
 
-  // Copy FUSE-related arguments to fuse_argv (skip argv[0] and disk image paths)
-  fuse_argv[0] = argv[0];
-  for (int i = num_disks + 1; i < argc; i++) {
-    fuse_argv[i - num_disks] = argv[i];
+  num_disks = superblock->num_disks;
+  //raid_mode = superblock->mode;
+
+  int f_argc = argc - num_disks;
+  char **f_argv = argv + num_disks;
+
+  printf("f_argc: %d\n", f_argc);
+  for (int i = 0; i < f_argc; i++) {
+    printf("f_argv[%d]: %s\n", i, f_argv[i]);
   }
 
-  // Debug: Print updated argc and argv for FUSE
-  printf("FUSE argc: %d\n", fuse_argc);
-  printf("FUSE argv:\n");
-  for (int i = 0; i < fuse_argc; i++) {
-    printf("  argv[%d]: %s\n", i, fuse_argv[i]);
+  int rc = fuse_main(f_argc, f_argv, &ops, NULL);
+  printf("Returned from fuse\n");
+
+  for (int i = 0; i < num_disks; i++) {
+    if (munmap(disks[i], diskSize) != 0) {
+      fprintf(stderr, "Failed to unmap disk %d\n", i);
+      return FAIL;
+    }
+    close(fileDescs[i]);
   }
-  //fuse_argc = fuse_argc - 1;
 
-  // Start FUSE
-  int result = fuse_main(fuse_argc, fuse_argv, &ops, NULL);
-  printf("Fuse main passed\n");
+  free(disks);
+  free(fileDescs);
 
-  // Free allocated memory
-  free(fuse_argv);
-  printf("Args freed\n");
-
-  return result;
+  return rc;
 }
