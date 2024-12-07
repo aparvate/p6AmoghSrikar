@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     root->num = 0;
-    root->mode = __S_IFDIR | S_IRWXU;
+    root->mode = S_IFDIR | S_IRWXU;
     root->uid = getuid();
     root->gid = getgid();
     root->size = 0;
