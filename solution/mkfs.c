@@ -1,68 +1,152 @@
-#include "stdlib.h"
-#include "stdio.h"
-#include "sys/stat.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <getopt.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <time.h>
 #include "wfs.h"
-#include "unistd.h"
-#define ALLOCATE_SUPER_BLOCK() (struct wfs_sb *)malloc(sizeof(struct wfs_sb))
-#define WFS_SB_SIZE (sizeof(struct wfs_sb))
-#define WFS_INODE_SIZE (sizeof(struct wfs_inode))
+
+struct wfsSbExtended {
+    struct wfs_sb base;
+    int raidNum;
+    int diskNum;
+} __attribute__((packed));
+
+void freeFunc(int* fds, void** diskMapStore){
+    free(fds);
+    free(diskMapStore);
+}
 
 int main(int argc, char *argv[]) {
-    if (argc != 7) {
-        exit(1);
+    int opt;
+    int raidNum = -1;
+    int nodeNum = -1;
+    int blockNum = -1;
+    char* disks[256] = {NULL};
+    int diskNum = 0;
+
+    while ((opt = getopt(argc, argv, "r:d:i:b:")) != -1) {
+        if (opt == 'r'){
+            if (strcmp(optarg, "0") == 0) {
+                raidNum = 0;
+            }
+            else if (strcmp(optarg, "1") == 0) {
+                raidNum = 1;
+            }
+            else if (strcmp(optarg, "1v") == 0) {
+                raidNum = 2;
+            }
+            else {
+                return 1;
+            }
+        }
+        if (opt == 'd'){
+            disks[diskNum++] = optarg;
+        }
+        if (opt == 'i'){
+            nodeNum = atoi(optarg);
+        }
+        if (opt == 'b'){
+            blockNum = atoi(optarg);
+        }
     }
-    FILE *disk = fopen(argv[2], "r+");
-    if (disk == NULL) {
-        exit(1);
+
+    //Errors
+    if (raidNum == -1 || diskNum < 2 || nodeNum <= 0 || blockNum <= 0) {
+        return 1;
     }
-    int inode = atoi(argv[4]);
-    int blocks = atoi(argv[6]);
-    inode = (inode + 31) / 32 * 32;
-    blocks = (blocks + 31) / 32 * 32;
-    fseek(disk, 0, SEEK_END);
-    int size_disk = ftell(disk);
-    int size = blocks * BLOCK_SIZE;
-    if ((size + (inode * BLOCK_SIZE) + (int)inode + (int)blocks + (int)WFS_SB_SIZE) > size_disk) {
-        exit(1);
+
+    //Sizes
+    blockNum = ((blockNum + 31) / 32) * 32;
+    nodeNum = ((nodeNum + 31) / 32) * 32;
+    size_t dataSize = (blockNum + 7) / 8;
+    size_t nodeSize = (nodeNum + 7) / 8;
+
+    //Offsets
+    off_t iOff = sizeof(struct wfsSbExtended);
+    off_t dOff = iOff + nodeSize;
+    off_t iStart = (((dOff + dataSize) + BLOCK_SIZE - 1) / BLOCK_SIZE) * BLOCK_SIZE;
+
+    //Size
+    size_t fsSize = (iStart + (nodeNum * BLOCK_SIZE)) + (blockNum * BLOCK_SIZE);
+
+    //Blocks
+    struct wfsSbExtended sb = {
+        .base = {
+            .num_inodes = nodeNum,
+            .num_data_blocks = blockNum,
+            .i_bitmap_ptr = iOff,
+            .d_bitmap_ptr = dOff,
+            .i_blocks_ptr = iStart,
+            .d_blocks_ptr = (iStart + (nodeNum * BLOCK_SIZE))
+        },
+        .raidNum = raidNum,
+        .diskNum = diskNum
+    };
+
+    int* fds = malloc(diskNum * sizeof(int));
+    void** diskMapStore = malloc(diskNum * sizeof(void*));
+
+    for (int i = 0; i < diskNum; i++) {
+        fds[i] = open(disks[i], O_RDWR);
+        if (fds[i] < 0) {
+            for (int j = 0; j < i; j++) {
+                munmap(diskMapStore[j], fsSize);
+                close(fds[j]);
+            }
+            freeFunc(fds, diskMapStore);
+            return -1;
+        }
+
+        struct stat st;
+        if (fstat(fds[i], &st) < 0 || st.st_size < fsSize) {
+            for (int j = 0; j < i; j++) {
+                munmap(diskMapStore[j], fsSize);
+                close(fds[j]);
+            }
+            close(fds[i]);
+            freeFunc(fds, diskMapStore);
+            return -1;
+        }
+
+        diskMapStore[i] = mmap(NULL, fsSize, PROT_READ | PROT_WRITE, MAP_SHARED, fds[i], 0);
+        if (mmap(NULL, fsSize, PROT_READ | PROT_WRITE, MAP_SHARED, fds[i], 0) == MAP_FAILED) {
+            for (int j = 0; j < i; j++) {
+                munmap(diskMapStore[j], fsSize);
+                close(fds[j]);
+            }
+            close(fds[i]);
+            freeFunc(fds, diskMapStore);
+            return -1;
+        }
+        // Writing
+        memset(diskMapStore[i], 0, fsSize);
+        memcpy(diskMapStore[i], &sb, sizeof(sb));
+        char* nodeMapSize = (char*)diskMapStore[i] + iOff;
+        memset(nodeMapSize, 0, nodeSize);
+        nodeMapSize[0] = 1;
+        // Root
+        struct wfs_inode root = {0};
+        root.mode = S_IFDIR | 0755;
+        root.uid = getuid();
+        root.gid = getgid();
+        root.nlinks = 2;
+        root.atim = time(NULL);
+        root.mtim = time(NULL);
+        root.ctim = time(NULL);
+        memcpy((char*)diskMapStore[i] + iStart, &root, sizeof(root));
+
+        msync(diskMapStore[i], fsSize, MS_SYNC);
     }
-    struct wfs_sb *super_block = ALLOCATE_SUPER_BLOCK();
-    if (super_block == NULL) {
-            exit(1);
+    // Cleaning
+    for (int i = 0; i < diskNum; i++) {
+        munmap(diskMapStore[i], fsSize);
+        close(fds[i]);
     }
-    super_block->num_inodes = inode;
-    super_block->num_data_blocks = blocks;
-    super_block->i_bitmap_ptr = 0x0 + WFS_SB_SIZE;
-    super_block->d_bitmap_ptr = super_block->i_bitmap_ptr + (inode/8);
-    super_block->i_blocks_ptr = super_block->d_bitmap_ptr + (blocks/8);
-    super_block->d_blocks_ptr = super_block->i_blocks_ptr + BLOCK_SIZE * inode;
-    fseek(disk, 0, SEEK_SET);
-    fwrite(super_block, WFS_SB_SIZE, 1, disk);
-    struct wfs_inode *root = malloc(WFS_INODE_SIZE);
-    if (root == NULL) {
-        exit(1);
-    }
-    root->num = 0;
-    root->mode = S_IFDIR | S_IRWXU;
-    root->uid = getuid();
-    root->gid = getgid();
-    root->size = 0;
-    root->nlinks = 0;
-    root->atim = time(NULL);
-    root->mtim = time(NULL);
-    root->ctim = time(NULL);
-    for (int i = 0; i < 7; i++) {
-        root->blocks[i] = 0;
-    }
-    fseek(disk, super_block->i_blocks_ptr, SEEK_SET);
-    fwrite(root, WFS_INODE_SIZE, 1, disk);
-    fseek(disk, super_block->i_bitmap_ptr, SEEK_SET);
-    int bit_map;
-    fread(&bit_map, super_block->d_bitmap_ptr - super_block->i_bitmap_ptr, 1, disk);
-    bit_map = 1;
-    fseek(disk, super_block->i_bitmap_ptr, SEEK_SET);
-    fwrite(&bit_map, super_block->d_bitmap_ptr - super_block->i_bitmap_ptr, 1, disk);
-    fclose(disk);
-    free(root);
-    free(super_block);
+    freeFunc(fds, diskMapStore);
     return 0;
 }
