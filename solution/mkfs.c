@@ -10,11 +10,9 @@
 #include <time.h>
 #include "wfs.h"
 
-struct wfsSbExtended {
-    struct wfs_sb base;
-    int raidNum;
-    int diskNum;
-} __attribute__((packed));
+// struct wfsSbExtended {
+//     struct wfs_sb base;
+// } __attribute__((packed));
 
 void freeFunc(int* fds, void** diskMapStore){
     free(fds);
@@ -67,7 +65,7 @@ int main(int argc, char *argv[]) {
     size_t nodeSize = (nodeNum + 7) / 8;
 
     //Offsets
-    off_t iOff = sizeof(struct wfsSbExtended);
+    off_t iOff = sizeof(struct wfs_sb);
     off_t dOff = iOff + nodeSize;
     off_t iStart = (((dOff + dataSize) + BLOCK_SIZE - 1) / BLOCK_SIZE) * BLOCK_SIZE;
 
@@ -75,17 +73,15 @@ int main(int argc, char *argv[]) {
     size_t fsSize = (iStart + (nodeNum * BLOCK_SIZE)) + (blockNum * BLOCK_SIZE);
 
     //Blocks
-    struct wfsSbExtended sb = {
-        .base = {
-            .num_inodes = nodeNum,
-            .num_data_blocks = blockNum,
-            .i_bitmap_ptr = iOff,
-            .d_bitmap_ptr = dOff,
-            .i_blocks_ptr = iStart,
-            .d_blocks_ptr = (iStart + (nodeNum * BLOCK_SIZE))
-        },
-        .raidNum = raidNum,
-        .diskNum = diskNum
+    struct wfs_sb sb = {
+        .num_inodes = nodeNum,
+        .num_data_blocks = blockNum,
+        .i_bitmap_ptr = iOff,
+        .d_bitmap_ptr = dOff,
+        .i_blocks_ptr = iStart,
+        .d_blocks_ptr = (iStart + (nodeNum * BLOCK_SIZE)),
+        .mode = raidNum,
+        .num_disks = diskNum
     };
 
     int* fds = malloc(diskNum * sizeof(int));
