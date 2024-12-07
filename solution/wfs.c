@@ -13,9 +13,10 @@
 
 int num_disks;
 int raid_mode;
-int fileDescs;
-char *disks[10];
-void *disk_images[10];
+int* fileDescs;
+//char *disks[10];
+void **disk_images;
+struct wfs_sb* superblock;
 
 size_t allocate_block(uint32_t *bitmap, size_t size) {
   for (uint32_t i = 0; i < size; i++) {
@@ -340,8 +341,8 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
-  disks = malloc(sizeof(void *) * num_disks);
-  if (disks == NULL) {
+  disk_images = malloc(sizeof(void *) * num_disks);
+  if (disk_images == NULL) {
     fprintf(stderr, "Memory allocation failed for disks\n");
     return -1;
   }
@@ -352,6 +353,7 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
+  struct stat st;
   for (int i = 0; i < num_disks; i++) {
     fileDescs[i] = open(argv[i + 1], O_RDWR);
     if (fileDescs[i] == -1) {
@@ -359,28 +361,27 @@ int main(int argc, char *argv[]) {
       return -1;
     }
 
-    struct stat st;
     if (fstat(fileDescs[i], &st) != 0) {
       fprintf(stderr, "Failed to get disk size for %s\n", argv[i + 1]);
       return -1;
     }
-    diskSize = st.st_size;
+    //diskSize = st.st_size;
 
-    disks[i] = mmap(NULL, diskSize, PROT_READ | PROT_WRITE, MAP_SHARED, fileDescs[i], 0);
-    if (disks[i] == MAP_FAILED) {
+    disk_images[i] = mmap(NULL, st.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fileDescs[i], 0);
+    if (disk_images[i] == MAP_FAILED) {
       fprintf(stderr, "Failed to mmap disk %s\n", argv[i + 1]);
       return -1;
     }
   }
 
-  superblock = (struct wfs_sb *)disks[0];
+  superblock = (struct wfs_sb *)disk_images[0];
 
   if (superblock == NULL) {
     fprintf(stderr, "Failed to access superblock\n");
     return -1;
   }
 
-  num_disks = superblock->num_disks;
+  //num_disks = superblock->num_disks;
   //raid_mode = superblock->mode;
 
   int f_argc = argc - num_disks;
@@ -395,14 +396,14 @@ int main(int argc, char *argv[]) {
   printf("Returned from fuse\n");
 
   for (int i = 0; i < num_disks; i++) {
-    if (munmap(disks[i], diskSize) != 0) {
+    if (munmap(disk_images[i], st.st_size) != 0) {
       fprintf(stderr, "Failed to unmap disk %d\n", i);
       return -1;
     }
     close(fileDescs[i]);
   }
 
-  free(disks);
+  free(disk_images);
   free(fileDescs);
 
   return rc;
