@@ -34,6 +34,7 @@ struct wfs_sb {
     // Extend after this line
     int mode;
     int num_disks;
+    int raid_mode;
 };
 
 // Inode
