@@ -240,6 +240,7 @@ static int add_parent_dir_entry(off_t parentIdx, const char *name, off_t newIdx)
                 // Write the new entry at the correct offset without disturbing existing entries
                 memcpy(&entries[entry_offset], &newEntry, sizeof(struct wfs_dentry));
                 printf("Mem-copied\n");
+              }
             }
             break;
           }
