@@ -125,21 +125,20 @@ static int allocate_data_block(struct wfs_inode* parentInode) {
             int is_used = (data_bitmap[i / 8] & (1 << (i % 8))) != 0;
             printf("Disk %d, Block %d: Used = %d, Bitmap = %d\n", j, i, is_used, data_bitmap[i / 8]);
             
-            if (is_used) {
-              char *blockAddr = (char*)disks[j] + superblock->d_blocks_ptr + 
-                        parentInode->blocks[i] * BLOCK_SIZE;
-              printf("Block Address: block pointer: %zd, block in node: %zd\n", superblock->d_blocks_ptr, parentInode->blocks[i]);
-              struct wfs_dentry *entries = (struct wfs_dentry*)blockAddr;
-              for (int k = 0; k * sizeof(struct wfs_dentry) < BLOCK_SIZE; k++){
-                printf("Dentry number: %d\n", k);
-                printf("Dentry->num: %d\n", entries[k].num);
-                if (entries[k].num <= 0) {
-                  printf("Empty dentry found\n");
-                  is_used = 0;
-                  is_free = 1;
-                  break;
-                }
+            char *blockAddr = (char*)disks[j] + superblock->d_blocks_ptr + parentInode->blocks[i] * BLOCK_SIZE;
+            printf("Block Address: block pointer: %zd, block in node: %zd\n", superblock->d_blocks_ptr, parentInode->blocks[i]);
+            struct wfs_dentry *entries = (struct wfs_dentry*)blockAddr;
+            for (int k = 0; k * sizeof(struct wfs_dentry) < BLOCK_SIZE; k++){
+              printf("Dentry number: %d\n", k);
+              printf("Dentry->num: %d\n", entries[k].num);
+              if (entries[k].num <= 0) {
+                printf("Empty dentry found\n");
+                is_used = 0;
+                is_free = 1;
+                break;
               }
+            }
+            if (is_used) {
               printf("is_used val: %d\n", is_used);
               is_free = 0;
               break;
