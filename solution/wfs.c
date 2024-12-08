@@ -35,7 +35,7 @@ struct wfs_inode* getInode(off_t index) {
 }
 
 // Helper: Find inode by path
-static int *findInode(const char *path) {
+static int findInode(const char *path) {
     printf("Getting Inode - Path = %s\n", path);
     // If the path is root, return the root inode index (0).
     if (strcmp(path, "/") == 0) {
