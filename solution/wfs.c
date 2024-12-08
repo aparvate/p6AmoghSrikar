@@ -183,6 +183,8 @@ static int add_parent_dir_entry(off_t parentIdx, const char *name, off_t newIdx)
     printf("Path: %s\n", name);
     printf("Parent ID: %zd\n", parentIdx);
     printf("New ID: %zd\n", newIdx);
+
+    printf("how many dentries in one block: %li\n", BLOCK_SIZE/sizeof(struct wfs_dentry));
     struct wfs_inode *parentInode = get_inode(parentIdx);
     
     // Calculate how many entries are currently in the directory
@@ -241,6 +243,7 @@ static int add_parent_dir_entry(off_t parentIdx, const char *name, off_t newIdx)
       // Calculate entry position in this disk
       char *blockAddr = (char*)disks[disk] + superblock->d_blocks_ptr + 
                         parentInode->blocks[block_idx] * BLOCK_SIZE;
+      printf("Block Address: block pointer: %zd, block in node: %zd\n", superblock->d_blocks_ptr, parentInode->blocks[block_idx]);
       struct wfs_dentry *entries = (struct wfs_dentry*)blockAddr;
       
       // Write the new entry at the correct offset without disturbing existing entries
