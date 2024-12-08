@@ -57,7 +57,7 @@ static int findInode(const char *path) {
         // Search for the token (path component) in the directory's entries.
         int found = 0;
         for (int offset = 0; offset < dir_inode->size; offset += sizeof(struct wfs_dentry)) {
-            struct wfs_dentry *entry = (struct wfs_dentry *)(disks[0] + superblock->d_blocks_ptr + 
+            struct wfs_dentry *entry = (struct wfs_dentry *)((char *)disks[0] + superblock->d_blocks_ptr + 
                                        dir_inode->blocks[0] * BLOCK_SIZE + offset);
             
             if (strcmp(entry->name, token) == 0) {
@@ -775,7 +775,7 @@ static int wfs_unlink(const char *path) {
     if (inodeIndex < 0) {
         return inodeIndex;
     }
-    struct wfs_inode *inode = getInode(inodeIndex);
+    struct wfs_inode *parent_inode = getInode(inodeIndex);
     if (!parent_inode || !S_ISDIR(parent_inode->mode)) {
         return -ENOENT; // Parent directory not found
     }
@@ -877,7 +877,7 @@ static int wfs_rmdir(const char *path) {
     if (inodeIndex < 0) {
         return inodeIndex;
     }
-    struct wfs_inode *inode = getInode(inodeIndex);
+    struct wfs_inode *parent_inode = getInode(inodeIndex);
     if (!parent_inode || !S_ISDIR(parent_inode->mode)) {
         return -ENOENT; // Parent directory not found
     }
