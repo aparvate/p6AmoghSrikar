@@ -925,65 +925,49 @@ int main(int argc, char *argv[]) {
     {
         diskNum++;
     }
-    
     if (diskNum < 1) {
-        fprintf(stderr, "Need at least 1 disks\n");
         return ERROR;
     }
 
-    // disks = malloc(sizeof(void *) * diskNum);
-    // if (disks == NULL) {
-    //     fprintf(stderr, "Memory allocation failed for disks\n");
-    //     return ERROR;
-    // }
-
     fileDescs = malloc(sizeof(int) * diskNum);
     if (fileDescs == NULL) {
-        fprintf(stderr, "Memory allocation failed for fileDescs\n");
         return ERROR;
     }
 
     for (int i = 0; i < diskNum; i++) {
         fileDescs[i] = open(argv[i + 1], O_RDWR);
         if (fileDescs[i] == -1) {
-            fprintf(stderr, "Failed to open disk %s\n", argv[i + 1]);
             return ERROR;
         }
 
         struct stat st;
         if (fstat(fileDescs[i], &st) != 0) {
-            fprintf(stderr, "Failed to get disk size for %s\n", argv[i + 1]);
             return ERROR;
         }
         diskSize = st.st_size;
 
         disks[i] = mmap(NULL, diskSize, PROT_READ | PROT_WRITE, MAP_SHARED, fileDescs[i], 0);
         if (disks[i] == MAP_FAILED) {
-            fprintf(stderr, "Failed to mmap disk %s\n", argv[i + 1]);
             return ERROR;
         }
     }
 
     superblock = (struct wfs_sb *)disks[0];
-
     if (superblock == NULL) {
-        fprintf(stderr, "Failed to access superblock\n");
         return ERROR;
     }
 
     diskNum = superblock->num_disks;
-    //raid_mode = superblock->mode;
-
     int f_argc = argc - diskNum;
     char **f_argv = argv + diskNum;
 
-    printf("f_argc: %d\n", f_argc);
-    for (int i = 0; i < f_argc; i++) {
-        printf("f_argv[%d]: %s\n", i, f_argv[i]);
-    }
+    //printf("Argument: %d\n", f_argc);
+    //for (int i = 0; i < f_argc; i++) {
+        //printf("Argument number %d: %s\n", i, f_argv[i]);
+    //}
 
-    int rc = fuse_main(f_argc, f_argv, &ops, NULL);
-    printf("Returned from fuse\n");
+    int returnValue = fuse_main(f_argc, f_argv, &ops, NULL);
+    //printf("Returned from fuse\n");
 
     for (int i = 0; i < diskNum; i++) {
         if (munmap(disks[i], diskSize) != 0) {
@@ -996,6 +980,6 @@ int main(int argc, char *argv[]) {
     //free(disks);
     free(fileDescs);
 
-    return rc;
+    return returnValue;
 }
 
