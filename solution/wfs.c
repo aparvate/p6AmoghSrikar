@@ -135,7 +135,7 @@ static int allocate_data_block(struct wfs_inode* parentInode) {
                 printf("Dentry->num: %d\n", entries[k].num);
                 if (entries[k].num == 0) {
                   printf("Empty dentry found\n");
-                  is_free = 0;
+                  is_used = 0
                   break;
                 }
               }
