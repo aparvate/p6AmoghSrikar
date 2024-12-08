@@ -253,21 +253,21 @@ static void write_inode(off_t idx, struct wfs_inode* newInode){
     return;
 }
 
-static void write_inode_across_disks(off_t idx, struct wfs_inode* newInode) {
-    printf("Entering write_inode_across_disks\n");
+// static void write_inode_across_disks(off_t idx, struct wfs_inode* newInode) {
+//     printf("Entering write_inode_across_disks\n");
     
-    // Write the inode to the inode block on ALL disks
-    for (int disk = 0; disk < superblock->num_disks; disk++) {
-        // Calculate the inode address for this specific disk
-        struct wfs_inode *inodeAddr = (struct wfs_inode*)
-            ((char*)disks[disk] + superblock->i_blocks_ptr + idx * BLOCK_SIZE);
+//     // Write the inode to the inode block on ALL disks
+//     for (int disk = 0; disk < superblock->num_disks; disk++) {
+//         // Calculate the inode address for this specific disk
+//         struct wfs_inode *inodeAddr = (struct wfs_inode*)
+//             ((char*)disks[disk] + superblock->i_blocks_ptr + idx * BLOCK_SIZE);
         
-        // Copy the entire inode block
-        memcpy(inodeAddr, newInode, BLOCK_SIZE);
-    }
+//         // Copy the entire inode block
+//         memcpy(inodeAddr, newInode, BLOCK_SIZE);
+//     }
     
-    printf("Exiting write_inode_across_disks\n");
-}
+//     printf("Exiting write_inode_across_disks\n");
+// }
 
 static off_t find_inode(const char *path) {
     printf("Entering find_inode: path = %s\n", path);
