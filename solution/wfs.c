@@ -113,9 +113,10 @@ struct wfs_inode* get_inode(off_t index) {
 
 struct allocInts allocate_data_block(struct wfs_inode* parentInode) {
     struct allocInts returnValue = { -ENOSPC, -ENOSPC };
+    printf("Parent Inode in Alloc Data Block: %d\n", parentInode->num);
     printf("Entering allocate_data_block\n");
     printf("Num of blocks: %zd\n", superblock->num_data_blocks);
-    for (int i = 0; i < superblock->num_data_blocks; i++) {
+    for (int i = parentInode->num*6; i < superblock->num_data_blocks; i++) {
         // Track if the block is free across all disks
         int is_free = 1;
         
