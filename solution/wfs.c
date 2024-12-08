@@ -219,9 +219,11 @@ static int add_parent_dir_entry(off_t parentIdx, const char *name, off_t newIdx)
     // Only zero out the block if it's newly allocated
     if (is_new_block) {
         for (int disk = 0; disk < superblock->num_disks; disk++) {
-            char *blockAddr = (char*)disks[disk] + superblock->d_blocks_ptr + 
-                            parentInode->blocks[block_idx] * BLOCK_SIZE;
-            memset(blockAddr, 0, BLOCK_SIZE);
+          printf("Zeroing out block in disk %d\n", disk);
+          char *blockAddr = (char*)disks[disk] + superblock->d_blocks_ptr + 
+                          parentInode->blocks[block_idx] * BLOCK_SIZE;
+          printf("Block address: %s\n", blockAddr);
+          memset(blockAddr, 0, BLOCK_SIZE);
         }
     }
     
