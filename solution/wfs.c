@@ -177,97 +177,97 @@ static int allocate_inode() {
     return -ENOSPC;  // No space left
 }
 
-// static int add_parent_dir_entry(off_t parentIdx, const char *name, off_t newIdx) {
-//     struct wfs_inode *parentInode = get_inode(parentIdx);
+static int add_parent_dir_entry(off_t parentIdx, const char *name, off_t newIdx) {
+    struct wfs_inode *parentInode = get_inode(parentIdx);
     
-//     // Calculate how many entries are currently in the directory
-//     size_t current_entries = parentInode->size / sizeof(struct wfs_dentry);
-//     size_t entries_per_block = BLOCK_SIZE / sizeof(struct wfs_dentry);
+    // Calculate how many entries are currently in the directory
+    size_t current_entries = parentInode->size / sizeof(struct wfs_dentry);
+    size_t entries_per_block = BLOCK_SIZE / sizeof(struct wfs_dentry);
     
-//     // Calculate which block we need and the offset within that block
-//     size_t block_idx = current_entries / entries_per_block;
-//     size_t entry_offset = current_entries % entries_per_block;
+    // Calculate which block we need and the offset within that block
+    size_t block_idx = current_entries / entries_per_block;
+    size_t entry_offset = current_entries % entries_per_block;
     
-//     // Check if we need a new block
-//     if (block_idx >= N_BLOCKS) {
-//         return -ENOSPC;  // No more blocks available
-//     }
+    // Check if we need a new block
+    if (block_idx >= N_BLOCKS) {
+        return -ENOSPC;  // No more blocks available
+    }
     
-//     // Allocate new block if needed
-//     bool is_new_block = false;
-//     if (parentInode->blocks[block_idx] == 0) {
-//         int newBlock = allocate_data_block();
-//         if (newBlock < 0) {
-//             return newBlock;
-//         }
-//         parentInode->blocks[block_idx] = newBlock;
-//         is_new_block = true;
-//     }
+    // Allocate new block if needed
+    bool is_new_block = false;
+    if (parentInode->blocks[block_idx] == 0) {
+        int newBlock = allocate_data_block();
+        if (newBlock < 0) {
+            return newBlock;
+        }
+        parentInode->blocks[block_idx] = newBlock;
+        is_new_block = true;
+    }
     
-//     // Only zero out the block if it's newly allocated
-//     if (is_new_block) {
-//         for (int disk = 0; disk < superblock->num_disks; disk++) {
-//             char *blockAddr = (char*)disks[disk] + superblock->d_blocks_ptr + 
-//                             parentInode->blocks[block_idx] * BLOCK_SIZE;
-//             memset(blockAddr, 0, BLOCK_SIZE);
-//         }
-//     }
+    // Only zero out the block if it's newly allocated
+    if (is_new_block) {
+        for (int disk = 0; disk < superblock->num_disks; disk++) {
+            char *blockAddr = (char*)disks[disk] + superblock->d_blocks_ptr + 
+                            parentInode->blocks[block_idx] * BLOCK_SIZE;
+            memset(blockAddr, 0, BLOCK_SIZE);
+        }
+    }
     
-//     // Create the new directory entry
-//     struct wfs_dentry newEntry;
-//     strncpy(newEntry.name, name, MAX_NAME - 1);
-//     newEntry.name[MAX_NAME - 1] = '\0';
-//     newEntry.num = newIdx;
+    // Create the new directory entry
+    struct wfs_dentry newEntry;
+    strncpy(newEntry.name, name, MAX_NAME - 1);
+    newEntry.name[MAX_NAME - 1] = '\0';
+    newEntry.num = newIdx;
     
-//     // Write the new entry to all disks
-//     for (int disk = 0; disk < superblock->num_disks; disk++) {
-//         // Calculate entry position in this disk
-//         char *blockAddr = (char*)disks[disk] + superblock->d_blocks_ptr + 
-//                          parentInode->blocks[block_idx] * BLOCK_SIZE;
-//         struct wfs_dentry *entries = (struct wfs_dentry*)blockAddr;
+    // Write the new entry to all disks
+    for (int disk = 0; disk < superblock->num_disks; disk++) {
+        // Calculate entry position in this disk
+        char *blockAddr = (char*)disks[disk] + superblock->d_blocks_ptr + 
+                         parentInode->blocks[block_idx] * BLOCK_SIZE;
+        struct wfs_dentry *entries = (struct wfs_dentry*)blockAddr;
         
-//         // Write the new entry at the correct offset without disturbing existing entries
-//         memcpy(&entries[entry_offset], &newEntry, sizeof(struct wfs_dentry));
-//     }
+        // Write the new entry at the correct offset without disturbing existing entries
+        memcpy(&entries[entry_offset], &newEntry, sizeof(struct wfs_dentry));
+    }
     
-//     // Update parent inode
-//     parentInode->size += sizeof(struct wfs_dentry);
-//     parentInode->nlinks++;
+    // Update parent inode
+    parentInode->size += sizeof(struct wfs_dentry);
+    parentInode->nlinks++;
     
-//     // Write updated inode to all disks
-//     for (int disk = 0; disk < superblock->num_disks; disk++) {
-//         struct wfs_inode *diskInode = (struct wfs_inode*)
-//             ((char*)disks[disk] + superblock->i_blocks_ptr + parentIdx * BLOCK_SIZE);
-//         memcpy(diskInode, parentInode, sizeof(struct wfs_inode));
-//         msync(disks[disk], diskSize, MS_SYNC);
-//     }
+    // Write updated inode to all disks
+    for (int disk = 0; disk < superblock->num_disks; disk++) {
+        struct wfs_inode *diskInode = (struct wfs_inode*)
+            ((char*)disks[disk] + superblock->i_blocks_ptr + parentIdx * BLOCK_SIZE);
+        memcpy(diskInode, parentInode, sizeof(struct wfs_inode));
+        msync(disks[disk], diskSize, MS_SYNC);
+    }
     
-//     return 0;
-// }
+    return 0;
+}
 
-// static void write_inode(off_t idx, struct wfs_inode* newInode){
-//     printf("Entering write_inode\n");
-//     struct wfs_inode *inodeAddr = (struct wfs_inode*) get_inode_block_addr(0, idx);
-//     memcpy(inodeAddr, newInode, BLOCK_SIZE);
-//     printf("Exiting write_inode\n");
-//     return;
-// }
+static void write_inode(off_t idx, struct wfs_inode* newInode){
+    printf("Entering write_inode\n");
+    struct wfs_inode *inodeAddr = (struct wfs_inode*) get_inode_block_addr(0, idx);
+    memcpy(inodeAddr, newInode, BLOCK_SIZE);
+    printf("Exiting write_inode\n");
+    return;
+}
 
-// static void write_inode_across_disks(off_t idx, struct wfs_inode* newInode) {
-//     printf("Entering write_inode_across_disks\n");
+static void write_inode_across_disks(off_t idx, struct wfs_inode* newInode) {
+    printf("Entering write_inode_across_disks\n");
     
-//     // Write the inode to the inode block on ALL disks
-//     for (int disk = 0; disk < superblock->num_disks; disk++) {
-//         // Calculate the inode address for this specific disk
-//         struct wfs_inode *inodeAddr = (struct wfs_inode*)
-//             ((char*)disks[disk] + superblock->i_blocks_ptr + idx * BLOCK_SIZE);
+    // Write the inode to the inode block on ALL disks
+    for (int disk = 0; disk < superblock->num_disks; disk++) {
+        // Calculate the inode address for this specific disk
+        struct wfs_inode *inodeAddr = (struct wfs_inode*)
+            ((char*)disks[disk] + superblock->i_blocks_ptr + idx * BLOCK_SIZE);
         
-//         // Copy the entire inode block
-//         memcpy(inodeAddr, newInode, BLOCK_SIZE);
-//     }
+        // Copy the entire inode block
+        memcpy(inodeAddr, newInode, BLOCK_SIZE);
+    }
     
-//     printf("Exiting write_inode_across_disks\n");
-// }
+    printf("Exiting write_inode_across_disks\n");
+}
 
 static off_t find_inode(const char *path) {
     printf("Entering find_inode: path = %s\n", path);
@@ -363,114 +363,46 @@ static int wfs_getattr(const char *path, struct stat *stbuf) {
 
 
 static int wfs_mknod(const char *path, mode_t mode, dev_t dev) {
-    printf("Entering wfs_mkdir\n");
-    printf("wfs_mkdir: path = %s\n", path);
+    printf("Entering wfs_mknod\n");
+    printf("Inode mode: %o\n", mode);
     char parentPath[MAX_PATH_NAME];
     char origPath[MAX_PATH_NAME];
     char childPath[MAX_PATH_NAME];
     strcpy(origPath, path);
     split_path(origPath, parentPath, childPath);
-    int parentInodeIdx = find_inode(parentPath);
-    printf("wfs_mkdir: Parent inode index: %i\n", parentInodeIdx);
+    int parentInode = find_inode(parentPath);
 
-    if (parentInodeIdx < 0) return -ENOENT;
+    if (parentInode < 0)
+        return -ENOENT;
 
-    if (find_inode(childPath) >= 0) return -EEXIST;
+    if (find_inode(childPath) >= 0)
+        return -EEXIST;
 
-    int childInodeIdx = allocate_inode();
-    printf("wfs_mkdir: Inode index: %i\n", childInodeIdx);
-    if (childInodeIdx < 0) return -ENOSPC;
+    int child_idx = allocate_inode();
+    if (child_idx < 0)
+        return -ENOSPC;
 
-    struct wfs_inode childInode = {0};
-    childInode.mode = (mode) | S_IFREG;
-    childInode.num = childInodeIdx;
-    childInode.nlinks = 2;
-    childInode.uid = getuid();
-    childInode.gid = getgid();
-    childInode.atim = childInode.mtim = childInode.ctim = time(NULL);
-    childInode.size = 0;
-    for (int i = 0; i < N_BLOCKS; i++) {
-        childInode.blocks[i] = -1;
+    struct wfs_inode inode = {0};
+    inode.num = child_idx;
+    inode.mode = mode | S_IFREG; //| //__S_IFREG;
+    inode.nlinks = 1;
+    inode.uid = getuid();
+    inode.gid = getgid();
+    inode.atim = inode.mtim = inode.ctim = time(NULL);
+    inode.size = 0;
+    int firstBlock = allocate_data_block();
+    if (firstBlock >= 0) {
+        memset((disks[0] + superblock->d_blocks_ptr + firstBlock * BLOCK_SIZE), 0, BLOCK_SIZE);
+        inode.blocks[0] = firstBlock;
     }
-
-    printf("wfs_mkdir: Starting directory entry logic!\n");
-    struct wfs_inode* parentInode = get_inode(parentInodeIdx);
-
-    // Find Block and dEntry
-    int blockIdx = -1;
-    int dataBlockIdx = -1;
-    int dentryIdx = -1;
-    int allocd = -1;
-    // Find first empty block (allocate block and use first dentry) or first empty dentry within alloced block
-    for (int i = 0; i < N_BLOCKS; i++) {
-        if (parentInode->blocks[i] == -1) {
-            printf("directory logic: first parent block empty allocing\n");
-            // Allocate a new block for directory entries
-            dataBlockIdx = allocate_data_block();
-            if (dataBlockIdx < 0){
-                printf("directory logic: BAD ALLOCATED BLOCK\n");
-                return -ENOSPC;
-            }
-            blockIdx = i;
-            dentryIdx = 0;
-            allocd = 1;
-            printf("directory logic: location - parentInode->blocks[%d]=%d at dentryIdx=%d\n", blockIdx, dataBlockIdx, dentryIdx);
-            break;
-        } else {
-            struct wfs_dentry *dentry = (struct wfs_dentry*)(disks[0] + superblock->d_blocks_ptr + parentInode->blocks[i] * BLOCK_SIZE);
-            for (int j = 0; j * sizeof(struct wfs_dentry) < BLOCK_SIZE; j++) {
-                if (dentry[j].num <= 0) {
-                    printf("directory logic: found room in alloced dBlock\n");
-                    blockIdx = i;
-                    dataBlockIdx = parentInode->blocks[i];
-                    dentryIdx = j;
-                    printf("directory logic: location - parentInode->blocks[%d]=%d at dentryIdx=%d\n", blockIdx, dataBlockIdx, dentryIdx);
-                    break;
-                }
-            }
-            if (blockIdx != -1 && dentryIdx != -1) break;
-        }
+    else
+    {
+        printf("wfs_mknod: BAD FIRST BLOCK\n");
     }
+    write_inode(child_idx, &inode);
 
-    if (blockIdx == -1 && dentryIdx == -1) return -ENOSPC;
-
-    // Create
-    struct wfs_dentry entry = {0};
-    strncpy(entry.name, childPath, MAX_NAME - 1);
-    entry.num = childInodeIdx;
-
-    // Put in
-    printf("directory logic: updating disk info\n");
-    for(int i = 0; i < superblock->num_disks; i++) {
-        // Place childInode
-        printf("directory logic: placing childInode into disk=%d childInodeIdx=%d\n", i, childInodeIdx);
-        memcpy(disks[i] + superblock->i_blocks_ptr + childInodeIdx * BLOCK_SIZE, &childInode, BLOCK_SIZE);
-
-        struct wfs_inode *parentInodePtr = (struct wfs_inode*)(disks[i] + superblock->i_blocks_ptr + parentInodeIdx * BLOCK_SIZE);
-        // Update blocks if we alloced
-        if (allocd == 1) {
-            printf("directory logic: alloc -> updating alloc disk info\n");
-            parentInodePtr->blocks[blockIdx] = dataBlockIdx;
-            memset((disks[i] + superblock->d_blocks_ptr + dataBlockIdx * BLOCK_SIZE), 0, BLOCK_SIZE);
-            printf("directory logic: set parentInodePtr->blocks[%d]=%d\n", blockIdx, dataBlockIdx);
-            printf("directory logic: cleared dataBlockIdx=%d\n", dataBlockIdx);
-        } else {
-            // Only clear entry
-            printf("directory logic: no alloc -> clearing parentInode->blocks[%d]\n", blockIdx);
-            memset(disks[i] + superblock->d_blocks_ptr + parentInode->blocks[blockIdx] * BLOCK_SIZE + dentryIdx * sizeof(struct wfs_dentry), 0, sizeof(struct wfs_dentry));
-        }
-
-        // Copy in dentry
-        // printf("directory logic: copying in dentry \n", blockIdx);
-        memcpy((disks[i] + superblock->d_blocks_ptr + dataBlockIdx * BLOCK_SIZE + dentryIdx * sizeof(struct wfs_dentry)), &entry, sizeof(struct wfs_dentry));
-        printf("directory logic: copied entry into dataBlockIdx=%d dentryIdx=%d\n", dataBlockIdx, dentryIdx);
-
-        // Edit parentInode
-        parentInodePtr->nlinks++;
-        parentInodePtr->size += sizeof(struct wfs_dentry);
-    }
-
-    printf("Returning from mkdir\n");
+    add_parent_dir_entry(parentInode, childPath, child_idx);
+    printf("Returning from mknod\n");
     return SUCCESS;
 }
 
