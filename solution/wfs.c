@@ -14,9 +14,9 @@
 
 
 // Constants
-#define ROOT_INODE 0
 #define SUCCEED 0
 #define ERROR -1
+#define MAX_PATH_NAME 264
 
 // Global variables
 void *disks[10];  // Memory-mapped disk images
@@ -35,16 +35,13 @@ struct wfs_inode* getInode(off_t index) {
 }
 
 // Helper: Find inode by path
-static off_t *findInode(const char *path, char* disk) {
+static off_t *findInode(const char *path) {
     printf("Getting Inode - Path = %s\n", path);
     // If the path is root, return the root inode index (0).
     if (strcmp(path, "/") == 0) {
         printf("Getting root inode\n");
         return 0;
     }
-
-    //printf("%s\n", path);
-    // Copy path for tokenization
     char temp_path[MAX_PATH_NAME];
     strncpy(temp_path, path, sizeof(temp_path));
     char *token = strtok(temp_path, "/");
@@ -55,7 +52,7 @@ static off_t *findInode(const char *path, char* disk) {
         // Ensure the current inode is a directory.
         if (!(dir_inode->mode & S_IFDIR)) {
             printf("Not a directory\n");
-            return -ENOTDIR; // Not a directory
+            return -1;
         }
         // Search for the token (path component) in the directory's entries.
         int found = 0;
