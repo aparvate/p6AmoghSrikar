@@ -116,57 +116,48 @@ struct allocInts allocate_data_block(struct wfs_inode* parentInode) {
     printf("Parent Inode in Alloc Data Block: %d\n", parentInode->num);
     printf("Entering allocate_data_block\n");
     printf("Num of blocks: %zd\n", superblock->num_data_blocks);
-    for (int i = parentInode->num*6; i < superblock->num_data_blocks; i++) {
         // Track if the block is free across all disks
-        int is_free = 1;
-        
-        // Debug: Print which block we're checking
-        printf("Checking block %d\n", i);
-        
-        // Check bitmap for each disk
-        for (int j = 0; j < superblock->num_disks; j++) {
-            char *data_bitmap = (char*)disks[j] + superblock->d_bitmap_ptr;
-            
-            // Debug: Print bitmap information
-            int is_used = (data_bitmap[i / 8] & (1 << (i % 8))) != 0;
-            printf("Disk %d, Block %d: Used = %d, Bitmap = %d\n", j, i, is_used, data_bitmap[i / 8]);
-            
-            char *blockAddr = (char*)disks[j] + superblock->d_blocks_ptr + parentInode->blocks[i] * BLOCK_SIZE;
-            printf("Block Address: block pointer: %zd, block in node: %zd\n", superblock->d_blocks_ptr, parentInode->blocks[i]);
-            struct wfs_dentry *entries = (struct wfs_dentry*)blockAddr;
-            for (int k = 0; k * sizeof(struct wfs_dentry) < BLOCK_SIZE; k++){
-              printf("Dentry number: %d\n", k);
-              printf("Dentry->num: %d\n", entries[k].num);
-              if (entries[k].num <= 0) {
-                printf("Empty dentry found\n");
-                is_used = 1;
-                is_free = 1;
-                break;
-              }
-            }
-            if (is_used && is_free != 1) {
-              printf("is_used val: %d\n", is_used);
-              returnValue.isUsed = is_used;
-              is_free = 0;
-              break;
-            }
+      int is_free = 1;
+      int is_used = 0;
+      
+      // Debug: Print which block we're checking
+      printf("Checking block %d\n", parentInode->num);
+      
+      char *blockAddr = (char*)disks[j] + superblock->d_blocks_ptr + parentInode->blocks[i] * BLOCK_SIZE;
+      printf("Block Address: block pointer: %zd, block in node: %zd\n", superblock->d_blocks_ptr, parentInode->blocks[i]);
+      struct wfs_dentry *entries = (struct wfs_dentry*)blockAddr;
+      for (int i = 0; i < D_BLOCK; i ++){
+        for (int k = 0; k * sizeof(struct wfs_dentry) < BLOCK_SIZE; k++){
+          printf("Dentry number: %d\n", k);
+          printf("Dentry->num: %d\n", entries[k].num);
+          if (entries[k].num <= 0) {
+            printf("Empty dentry found\n");
+            is_used = 1;
+            is_free = 1;
+            break;
+          }
         }
-        
+        if (is_used && is_free != 1) {
+          printf("is_used val: %d\n", is_used);
+          returnValue.isUsed = is_used;
+          is_free = 0;
+          break;
+        }
         if (is_free) {
-            printf("Allocating block %d\n", i);
+          printf("Allocating block %d\n", i);
+          
+          // Mark block as used on ALL disks
+          for (int disk = 0; disk < superblock->num_disks; disk++) {
+            char *data_bitmap = (char*)disks[disk] + superblock->d_bitmap_ptr;
+            data_bitmap[i / 8] |= (1 << (i % 8));
             
-            // Mark block as used on ALL disks
-            for (int disk = 0; disk < superblock->num_disks; disk++) {
-                char *data_bitmap = (char*)disks[disk] + superblock->d_bitmap_ptr;
-                data_bitmap[i / 8] |= (1 << (i % 8));
-                
-                // Debug: Confirm bitmap update
-                printf("Marked block %d as used on disk %d\n", i, disk);
-            }
-            returnValue.returnInt = i;
-            return returnValue;
+            // Debug: Confirm bitmap update
+            printf("Marked block %d as used on disk %d\n", i, disk);
+          }
+          returnValue.returnInt = i;
+          return returnValue;
         }
-    }
+      }
     
     printf("No free blocks found\n");
     return returnValue;  // No space left
