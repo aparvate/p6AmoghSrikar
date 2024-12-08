@@ -161,7 +161,8 @@ struct allocInts allocate_data_block(struct wfs_inode* parentInode) {
                 // Debug: Confirm bitmap update
                 printf("Marked block %d as used on disk %d\n", i, disk);
             }
-            returnValue = {i, is_used};
+            returnValue.returnInt = i;
+            returnValue.isUsed = is_used;
             return returnValue;
         }
     }
@@ -226,20 +227,22 @@ static int add_parent_dir_entry(off_t parentIdx, const char *name, off_t newIdx)
     
     // Allocate new block if needed
     bool is_new_block = false;
+    bool is_used = false;
     printf("Need new block\n");
     if (parentInode->blocks[block_idx] == 0) {
-        struct allocInts* newBlock = allocate_data_block(parentInode);
+        struct allocInts newBlock = allocate_data_block(parentInode);
         if (newBlock->returnInt < 0) {
             printf("New block not allocated\n");
-            return newBlock;
+            return newBlock->returnInt;
         }
         parentInode->blocks[block_idx] = newBlock->returnInt;
+        is_used = true;
         is_new_block = true;
         printf("New block found\n");
     }
     
     // Only zero out the block if it's newly allocated
-    if (is_new_block && newBlock->is_used != 1) {
+    if (is_new_block && !is_used) {
         for (int disk = 0; disk < superblock->num_disks; disk++) {
           printf("Zeroing out block in disk %d\n", disk);
           char *blockAddr = (char*)disks[disk] + superblock->d_blocks_ptr + 
