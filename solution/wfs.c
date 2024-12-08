@@ -132,6 +132,7 @@ static int allocate_data_block(struct wfs_inode* parentInode) {
               struct wfs_dentry *entries = (struct wfs_dentry*)blockAddr;
               for (int k = 0; k * sizeof(struct wfs_dentry) < BLOCK_SIZE; k++){
                 printf("Dentry number: %d\n", k);
+                printf("Dentry->num: %d\n", entries[k].num);
                 if (entries[k].num < 0) {
                   printf("Empty dentry found\n");
                   is_free = 0;
