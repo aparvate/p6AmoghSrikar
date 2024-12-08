@@ -125,7 +125,7 @@ static int allocate_data_block(struct wfs_inode* parentInode) {
             int is_used = (data_bitmap[i / 8] & (1 << (i % 8))) != 0;
             printf("Disk %d, Block %d: Used = %d, Bitmap = %d\n", j, i, is_used, data_bitmap[i / 8]);
             
-            if (!is_used){
+            if (is_used) {
               char *blockAddr = (char*)disks[j] + superblock->d_blocks_ptr + 
                         parentInode->blocks[i] * BLOCK_SIZE;
               printf("Block Address: block pointer: %zd, block in node: %zd\n", superblock->d_blocks_ptr, parentInode->blocks[i]);
@@ -140,11 +140,9 @@ static int allocate_data_block(struct wfs_inode* parentInode) {
                   break;
                 }
               }
-            }
-            if (is_used) {
               printf("is_used val: %d\n", is_used);
-                is_free = 0;
-                break;
+              is_free = 0;
+              break;
             }
         }
         
