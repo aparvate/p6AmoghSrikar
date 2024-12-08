@@ -107,7 +107,7 @@ struct wfs_inode* get_inode(off_t index) {
     return (struct wfs_inode*)((char*)inode_offset + index * BLOCK_SIZE);
 }
 
-static int allocate_data_block(struct wfs_inode** parentInode) {
+static int allocate_data_block(struct wfs_inode* parentInode) {
     printf("Entering allocate_data_block\n");
     printf("Num of blocks: %zd\n", superblock->num_data_blocks);
     for (int i = 0; i < superblock->num_data_blocks; i++) {
@@ -223,7 +223,7 @@ static int add_parent_dir_entry(off_t parentIdx, const char *name, off_t newIdx)
     bool is_new_block = false;
     printf("Need new block\n");
     if (parentInode->blocks[block_idx] == 0) {
-        int newBlock = allocate_data_block(&parentInode);
+        int newBlock = allocate_data_block(parentInode);
         if (newBlock < 0) {
             printf("New block not allocated\n");
             return newBlock;
@@ -428,7 +428,7 @@ static int wfs_mknod(const char *path, mode_t mode, dev_t dev) {
     inode.gid = getgid();
     inode.atim = inode.mtim = inode.ctim = time(NULL);
     inode.size = 0;
-    int firstBlock = allocate_data_block(&parentInode);
+    int firstBlock = allocate_data_block(parentInode);
     if (firstBlock >= 0) {
         memset((disks[0] + superblock->d_blocks_ptr + firstBlock * BLOCK_SIZE), 0, BLOCK_SIZE);
         inode.blocks[0] = firstBlock;
