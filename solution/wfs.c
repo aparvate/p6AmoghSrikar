@@ -183,7 +183,7 @@ static int add_parent_dir_entry(off_t parentIdx, const char *name, off_t newIdx)
     printf("Parent ID: %zd\n", parentIdx);
     printf("New ID: %zd\n", newIdx);
 
-    printf("how many dentries in one block: %li\n", BLOCK_SIZE/sizeof(struct wfs_dentry);
+    printf("how many dentries in one block: %li\n", BLOCK_SIZE/sizeof(struct wfs_dentry));
     struct wfs_inode *parentInode = get_inode(parentIdx);
     
     // Calculate how many entries are currently in the directory
@@ -213,10 +213,10 @@ static int add_parent_dir_entry(off_t parentIdx, const char *name, off_t newIdx)
         // looping thorugh every single datablock
         for (int i = 0; i < superblock->num_data_blocks; i++) {
           // Track if the block is free across all disks
-          int is_free = 1;
+        //   int is_free = 1;
 
           // looking through the memory inside the current data block
-          for (int j = 0; j < BLOCK_SIZE, j += sizeof(struct wfs_dentry)){
+          for (int j = 0; j < BLOCK_SIZE; j += sizeof(struct wfs_dentry)){
             // if the space is not allocated (AKA nothing here), put dentry here
             // entry is the arbitrary entry that already exists at this location (or is empty space)
             struct wfs_dentry *entry = (struct wfs_dentry *)(disks[0] + superblock->d_blocks_ptr + j);
@@ -285,7 +285,7 @@ static int add_parent_dir_entry(off_t parentIdx, const char *name, off_t newIdx)
     //   // Write the new entry at the correct offset without disturbing existing entries
     //   memcpy(&entries[entry_offset], &newEntry, sizeof(struct wfs_dentry));
     //   printf("Mem-copied\n");
-    }
+    // }
     
     // Update parent inode
     printf("Updating parent Inode\n");
