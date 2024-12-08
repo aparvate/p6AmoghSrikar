@@ -30,7 +30,7 @@ size_t diskSize;
 struct allocInts {
   int returnInt;
   int isUsed;
-}
+};
 
 void split_path(const char *path, char *parent_path, char *new_name) {
     const char *last_slash = strrchr(path, '/');
