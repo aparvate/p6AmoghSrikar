@@ -27,6 +27,10 @@ static int num_disks;
 static int *fileDescs;
 size_t diskSize;
 //static char* blocks;
+struct allocInts = {
+  int returnInt;
+  int isUsed;
+}
 
 void split_path(const char *path, char *parent_path, char *new_name) {
     const char *last_slash = strrchr(path, '/');
@@ -107,7 +111,7 @@ struct wfs_inode* get_inode(off_t index) {
     return (struct wfs_inode*)((char*)inode_offset + index * BLOCK_SIZE);
 }
 
-static int allocate_data_block(struct wfs_inode* parentInode) {
+struct allocInts allocate_data_block(struct wfs_inode* parentInode) {
     printf("Entering allocate_data_block\n");
     printf("Num of blocks: %zd\n", superblock->num_data_blocks);
     for (int i = 0; i < superblock->num_data_blocks; i++) {
@@ -223,7 +227,7 @@ static int add_parent_dir_entry(off_t parentIdx, const char *name, off_t newIdx)
     bool is_new_block = false;
     printf("Need new block\n");
     if (parentInode->blocks[block_idx] == 0) {
-        int newBlock = allocate_data_block(parentInode);
+        struct allocInts* newBlock = allocate_data_block(parentInode);
         if (newBlock < 0) {
             printf("New block not allocated\n");
             return newBlock;
