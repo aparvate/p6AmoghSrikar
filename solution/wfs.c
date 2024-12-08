@@ -107,7 +107,7 @@ struct wfs_inode* get_inode(off_t index) {
     return (struct wfs_inode*)((char*)inode_offset + index * BLOCK_SIZE);
 }
 
-static int allocate_data_block(struct wfs_inode* parentInode) {
+static int allocate_data_block(struct wfs_inode** parentInode) {
     printf("Entering allocate_data_block\n");
     printf("Num of blocks: %zd\n", superblock->num_data_blocks);
     for (int i = 0; i < superblock->num_data_blocks; i++) {
@@ -128,9 +128,9 @@ static int allocate_data_block(struct wfs_inode* parentInode) {
             if (!is_used){
               char *blockAddr = (char*)disks[j] + superblock->d_blocks_ptr + 
                         parentInode->blocks[i] * BLOCK_SIZE;
-              printf("Block Address: block pointer: %zd, block in node: %zd\n", superblock->d_blocks_ptr, parentInode->blocks[block_idx]);
+              printf("Block Address: block pointer: %zd, block in node: %zd\n", superblock->d_blocks_ptr, parentInode->blocks[i]);
               struct wfs_dentry *entries = (struct wfs_dentry*)blockAddr;
-              for (int k = 0; k * sizeof(wfs_dentry) < BLOCK_SIZE; k++){
+              for (int k = 0; k * sizeof(struct wfs_dentry) < BLOCK_SIZE; k++){
                 printf("Dentry number: %d\n", k);
                 if (entries[k].num < 0) {
                   printf("Empty dentry found\n");
