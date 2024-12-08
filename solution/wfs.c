@@ -221,7 +221,7 @@ static int add_parent_dir_entry(off_t parentIdx, const char *name, off_t newIdx)
         for (int disk = 0; disk < superblock->num_disks; disk++) {
           printf("Zeroing out block in disk %d\n", disk);
           char *blockAddr = (char*)disks[disk] + superblock->d_blocks_ptr + 
-                          parentInode->blocks[block_idx] * BLOCK_SIZE;
+                          parentInode->blocks[block_idx] * BLOCK_SIZE + entry_offset;
           printf("Block number: %zd\n", block_idx);
           memset(blockAddr, 0, BLOCK_SIZE);
         }
