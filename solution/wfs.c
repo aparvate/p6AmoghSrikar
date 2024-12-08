@@ -119,6 +119,7 @@ static int allocate_data_block() {
         // Check bitmap for each disk
         for (int j = 0; j < superblock->num_disks; j++) {
             char *data_bitmap = (char*)disks[j] + superblock->d_bitmap_ptr;
+            
             // Debug: Print bitmap information
             //int is_used = (data_bitmap[i / 8] & (1 << (i % 8))) != 0;
             int is_used = data_bitmap[i / 8] * 0;
@@ -182,8 +183,6 @@ static int add_parent_dir_entry(off_t parentIdx, const char *name, off_t newIdx)
     printf("Path: %s\n", name);
     printf("Parent ID: %zd\n", parentIdx);
     printf("New ID: %zd\n", newIdx);
-
-    printf("how many dentries in one block: %li\n", BLOCK_SIZE/sizeof(struct wfs_dentry));
     struct wfs_inode *parentInode = get_inode(parentIdx);
     
     // Calculate how many entries are currently in the directory
@@ -209,45 +208,6 @@ static int add_parent_dir_entry(off_t parentIdx, const char *name, off_t newIdx)
     printf("Need new block\n");
     if (parentInode->blocks[block_idx] == 0) {
         int newBlock = allocate_data_block();
-        
-        // looping thorugh every single datablock
-        for (int i = 0; i < superblock->num_data_blocks; i++) {
-          // Track if the block is free across all disks
-        //   int is_free = 1;
-
-          // looking through the memory inside the current data block
-          for (int j = 0; j < BLOCK_SIZE; j += sizeof(struct wfs_dentry)){
-            // if the space is not allocated (AKA nothing here), put dentry here
-            // entry is the arbitrary entry that already exists at this location (or is empty space)
-            struct wfs_dentry *entry = (struct wfs_dentry *)(disks[0] + superblock->d_blocks_ptr + j);
-
-            if (entry->num < 0) {
-              // we do something like superblock->d_bitmap_ptr + entry = our dentry
-              printf("Creating new directory entry\n");
-              struct wfs_dentry newEntry;
-              strncpy(newEntry.name, name, MAX_NAME - 1);
-              newEntry.name[MAX_NAME - 1] = '\0';
-              newEntry.num = newIdx;
-              
-              // Write the new entry to all disks
-              for (int disk = 0; disk < superblock->num_disks; disk++) {
-                printf("Disk: %d\n", disk);
-                // Calculate entry position in this disk
-                char *blockAddr = (char*)disks[disk] + superblock->d_blocks_ptr + 
-                                  parentInode->blocks[i] * BLOCK_SIZE + j;
-                struct wfs_dentry *entries = (struct wfs_dentry*)blockAddr;
-                
-                // Write the new entry at the correct offset without disturbing existing entries
-                memcpy(&entries[entry_offset], &newEntry, sizeof(struct wfs_dentry));
-                printf("Mem-copied\n");
-              }
-            }
-            break;
-          }
-          // Debug: Print which block we're checking
-          printf("Checking block %d\n", i);
-            
-        }
         if (newBlock < 0) {
             printf("New block not allocated\n");
             return newBlock;
@@ -269,24 +229,24 @@ static int add_parent_dir_entry(off_t parentIdx, const char *name, off_t newIdx)
     }
     
     // Create the new directory entry
-    // printf("Creating new directory entry\n");
-    // struct wfs_dentry newEntry;
-    // strncpy(newEntry.name, name, MAX_NAME - 1);
-    // newEntry.name[MAX_NAME - 1] = '\0';
-    // newEntry.num = newIdx;
+    printf("Creating new directory entry\n");
+    struct wfs_dentry newEntry;
+    strncpy(newEntry.name, name, MAX_NAME - 1);
+    newEntry.name[MAX_NAME - 1] = '\0';
+    newEntry.num = newIdx;
     
-    // // Write the new entry to all disks
-    // for (int disk = 0; disk < superblock->num_disks; disk++) {
-    //   printf("Disk: %d\n", disk);
-    //   // Calculate entry position in this disk
-    //   char *blockAddr = (char*)disks[disk] + superblock->d_blocks_ptr + 
-    //                     parentInode->blocks[block_idx] * BLOCK_SIZE;
-    //   struct wfs_dentry *entries = (struct wfs_dentry*)blockAddr;
+    // Write the new entry to all disks
+    for (int disk = 0; disk < superblock->num_disks; disk++) {
+      printf("Disk: %d\n", disk);
+      // Calculate entry position in this disk
+      char *blockAddr = (char*)disks[disk] + superblock->d_blocks_ptr + 
+                        parentInode->blocks[block_idx] * BLOCK_SIZE;
+      struct wfs_dentry *entries = (struct wfs_dentry*)blockAddr;
       
-    //   // Write the new entry at the correct offset without disturbing existing entries
-    //   memcpy(&entries[entry_offset], &newEntry, sizeof(struct wfs_dentry));
-    //   printf("Mem-copied\n");
-    // }
+      // Write the new entry at the correct offset without disturbing existing entries
+      memcpy(&entries[entry_offset], &newEntry, sizeof(struct wfs_dentry));
+      printf("Mem-copied\n");
+    }
     
     // Update parent inode
     printf("Updating parent Inode\n");
