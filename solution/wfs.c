@@ -259,7 +259,7 @@ static int add_parent_dir_entry(off_t parentIdx, const char *name, off_t newIdx)
       msync(disks[disk], diskSize, MS_SYNC);
     }
     
-    printf("Finished adding dentry to parent %d\n");
+    printf("Finished adding dentry to parent\n");
     return 0;
 }
 
