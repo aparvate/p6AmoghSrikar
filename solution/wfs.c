@@ -122,7 +122,7 @@ static int allocate_data_block() {
             
             // Debug: Print bitmap information
             int is_used = (data_bitmap[i / 8] & (1 << (i % 8))) != 0;
-            printf("Disk %d, Block %d: Used = %d\n", j, i, is_used);
+            printf("Disk %d, Block %d: Used = %d Bitmap = %s\n", j, i, is_used, data_bitmap);
             
             if (is_used) {
                 is_free = 0;
