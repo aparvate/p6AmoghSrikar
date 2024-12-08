@@ -113,52 +113,69 @@ struct wfs_inode* get_inode(off_t index) {
 
 struct allocInts allocate_data_block(struct wfs_inode* parentInode) {
     struct allocInts returnValue = { -ENOSPC, -ENOSPC };
-    printf("Parent Inode in Alloc Data Block: %d\n", parentInode->num);
     printf("Entering allocate_data_block\n");
+    printf("Parent Inode in Alloc Data Block: %d\n", parentInode->num);
     printf("Num of blocks: %zd\n", superblock->num_data_blocks);
-        // Track if the block is free across all disks
-      int is_free = 1;
-      int is_used = 0;
-      
-      // Debug: Print which block we're checking
-      printf("Checking block %d\n", parentInode->num);
-      
-      for (int i = 0; i < D_BLOCK; i ++){
-        char *blockAddr = (char*)disks[0] + superblock->d_blocks_ptr + parentInode->blocks[i] * BLOCK_SIZE;
-        printf("Block Address: block pointer: %zd, block in node: %zd\n", superblock->d_blocks_ptr, parentInode->blocks[i]);
-        struct wfs_dentry *entries = (struct wfs_dentry*)blockAddr;
-        for (int k = 0; k * sizeof(struct wfs_dentry) < BLOCK_SIZE; k++){
-          printf("Dentry number: %d\n", k);
-          printf("Dentry->num: %d\n", entries[k].num);
-          if (entries[k].num <= 0) {
-            printf("Empty dentry found\n");
-            is_used = 1;
-            is_free = 1;
-            break;
-          }
+
+    // Iterate through parent inode's blocks
+    for (int i = 0; i < N_BLOCKS; i++) {
+        // If this block is unused in the inode
+        if (parentInode->blocks[i] == -1) {
+            // Allocate a new block
+            for (int blockNum = 0; blockNum < superblock->num_data_blocks; blockNum++) {
+                int is_free = 1;
+
+                // Check block availability across all disks
+                for (int disk = 0; disk < superblock->num_disks; disk++) {
+                    char *data_bitmap = (char*)disks[disk] + superblock->d_bitmap_ptr;
+                    
+                    // Check if block is already used
+                    if (data_bitmap[blockNum / 8] & (1 << (blockNum % 8))) {
+                        is_free = 0;
+                        break;
+                    }
+                }
+
+                // If block is free, mark it as used and return
+                if (is_free) {
+                    for (int disk = 0; disk < superblock->num_disks; disk++) {
+                        char *data_bitmap = (char*)disks[disk] + superblock->d_bitmap_ptr;
+                        // Mark block as used on bitmap
+                        data_bitmap[blockNum / 8] |= (1 << (blockNum % 8));
+                        
+                        // Zero out the block
+                        memset(disks[disk] + superblock->d_blocks_ptr + blockNum * BLOCK_SIZE, 0, BLOCK_SIZE);
+                        
+                        printf("Marked block %d as used on disk %d\n", blockNum, disk);
+                    }
+
+                    returnValue.returnInt = blockNum;
+                    returnValue.isUsed = 1;
+                    return returnValue;
+                }
+            }
         }
-        if (is_used && is_free != 1) {
-          printf("is_used val: %d\n", is_used);
-          returnValue.isUsed = is_used;
-          is_free = 0;
-          break;
-        }
-        if (is_free) {
-          printf("Allocating block %d\n", i);
-          
-          // Mark block as used on ALL disks
-          for (int disk = 0; disk < superblock->num_disks; disk++) {
-            char *data_bitmap = (char*)disks[disk] + superblock->d_bitmap_ptr;
-            data_bitmap[i / 8] |= (1 << (i % 8));
+        // If block is already allocated, check its dentries
+        else {
+            char *blockAddr = (char*)disks[0] + superblock->d_blocks_ptr + parentInode->blocks[i] * BLOCK_SIZE;
+            struct wfs_dentry *entries = (struct wfs_dentry*)blockAddr;
             
-            // Debug: Confirm bitmap update
-            printf("Marked block %d as used on disk %d\n", i, disk);
-          }
-          returnValue.returnInt = i;
-          return returnValue;
+            // Check each dentry in the block
+            for (int k = 0; k * sizeof(struct wfs_dentry) < BLOCK_SIZE; k++) {
+                printf("Dentry number: %d\n", k);
+                printf("Dentry->num: %d\n", entries[k].num);
+                
+                // If dentry is empty, we can use this block
+                if (entries[k].num <= 0) {
+                    printf("Empty dentry found\n");
+                    returnValue.returnInt = parentInode->blocks[i];
+                    returnValue.isUsed = 1;
+                    return returnValue;
+                }
+            }
         }
-      }
-    
+    }
+
     printf("No free blocks found\n");
     return returnValue;  // No space left
 }
