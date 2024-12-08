@@ -112,6 +112,7 @@ struct wfs_inode* get_inode(off_t index) {
 }
 
 struct allocInts allocate_data_block(struct wfs_inode* parentInode) {
+    struct allocInts returnValue = { -ENOSPC, -ENOSPC };
     printf("Entering allocate_data_block\n");
     printf("Num of blocks: %zd\n", superblock->num_data_blocks);
     for (int i = 0; i < superblock->num_data_blocks; i++) {
@@ -137,12 +138,12 @@ struct allocInts allocate_data_block(struct wfs_inode* parentInode) {
               printf("Dentry->num: %d\n", entries[k].num);
               if (entries[k].num <= 0) {
                 printf("Empty dentry found\n");
-                is_used = 0;
+                is_used = 1;
                 is_free = 1;
                 break;
               }
             }
-            if (is_used) {
+            if (is_used && is_free != 1) {
               printf("is_used val: %d\n", is_used);
               is_free = 0;
               break;
@@ -160,13 +161,13 @@ struct allocInts allocate_data_block(struct wfs_inode* parentInode) {
                 // Debug: Confirm bitmap update
                 printf("Marked block %d as used on disk %d\n", i, disk);
             }
-            
-            return i;
+            returnValue = {i, is_used};
+            return returnValue;
         }
     }
     
     printf("No free blocks found\n");
-    return -ENOSPC;  // No space left
+    return returnValue;  // No space left
 }
 
 static int allocate_inode() {
@@ -228,17 +229,17 @@ static int add_parent_dir_entry(off_t parentIdx, const char *name, off_t newIdx)
     printf("Need new block\n");
     if (parentInode->blocks[block_idx] == 0) {
         struct allocInts* newBlock = allocate_data_block(parentInode);
-        if (newBlock < 0) {
+        if (newBlock->returnInt < 0) {
             printf("New block not allocated\n");
             return newBlock;
         }
-        parentInode->blocks[block_idx] = newBlock;
+        parentInode->blocks[block_idx] = newBlock->returnInt;
         is_new_block = true;
         printf("New block found\n");
     }
     
     // Only zero out the block if it's newly allocated
-    if (is_new_block) {
+    if (is_new_block && newBlock->is_used != 1) {
         for (int disk = 0; disk < superblock->num_disks; disk++) {
           printf("Zeroing out block in disk %d\n", disk);
           char *blockAddr = (char*)disks[disk] + superblock->d_blocks_ptr + 
