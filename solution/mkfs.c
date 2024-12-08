@@ -76,7 +76,7 @@ int main(int argc, char *argv[]) {
         .d_bitmap_ptr = dOff,
         .i_blocks_ptr = iStart,
         .d_blocks_ptr = (iStart + (nodeNum * BLOCK_SIZE)),
-        .mode = raidNum,
+        .raid_mode = raidNum,
         .num_disks = diskNum
     };
 
