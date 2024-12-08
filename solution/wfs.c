@@ -125,6 +125,20 @@ static int allocate_data_block() {
             int is_used = (data_bitmap[i / 8] & (1 << (i % 8))) != 0;
             printf("Disk %d, Block %d: Used = %d, Bitmap = %d\n", j, i, is_used, data_bitmap[i / 8]);
             
+            if (!is_used){
+              char *blockAddr = (char*)disks[j] + superblock->d_blocks_ptr + 
+                        parentInode->blocks[i] * BLOCK_SIZE;
+              printf("Block Address: block pointer: %zd, block in node: %zd\n", superblock->d_blocks_ptr, parentInode->blocks[block_idx]);
+              struct wfs_dentry *entries = (struct wfs_dentry*)blockAddr;
+              for (int k = 0; k * sizeof(wfs_dentry) < BLOCK_SIZE; k++){
+                printf("Dentry number: %d\n", k);
+                if (entries[k].num < 0) {
+                  printf("Empty dentry found\n");
+                  is_free = 0;
+                  break;
+                }
+              }
+            }
             if (is_used) {
                 is_free = 0;
                 break;
