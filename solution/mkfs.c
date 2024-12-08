@@ -1,72 +1,27 @@
-//MKFS File
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <fcntl.h>
-#include <errno.h>
+#include <getopt.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <sys/mman.h>
+#include <fcntl.h>
 #include <time.h>
 #include "wfs.h"
 
 #define ALIGN_UP(x, align) (((x) + ((align)-1)) & ~((align)-1))
 #define ROUND_UP(x, align) (((x) + ((align)-1)) & ~((align)-1))
 
-int raid_mode = -1;
-char *disk_files[10];
-int num_disks = 0;
-int num_inodes = 0;
-int num_data_blocks = 0;
+int raidNum = -1;
+char *disks[10];
+int diskNum = 0;
+int nodeNum = 0;
+int blockNum = 0;
 
 void print_usage() {
     fprintf(stderr, "Usage: mkfs -r <mode> -d <disk> ... -i <num_inodes> -b <num_blocks>\n");
     exit(1);
-}
-
-void parse_arguments(int argc, char *argv[]) {
-    int opt;
-    while ((opt = getopt(argc, argv, "r:d:i:b:")) != -1) {
-        switch (opt) {
-        case 'r':
-            if (strcmp(optarg, "0") == 0) raid_mode = 0;
-            else if (strcmp(optarg, "1") == 0) raid_mode = 1;
-            else if (strcmp(optarg, "1v") == 0) raid_mode = 2;
-            else {
-                fprintf(stderr, "Error: Invalid RAID mode\n");
-                exit(1);
-            }
-            break;
-        case 'd':
-            if (num_disks >= 10) {
-                fprintf(stderr, "Error: Too many disks\n");
-                exit(1);
-            }
-            disk_files[num_disks++] = optarg;
-            break;
-        case 'i':
-            num_inodes = atoi(optarg);
-            break;
-        case 'b':
-            num_data_blocks = atoi(optarg);
-            break;
-        default:
-            print_usage();
-        }
-    }
-
-    if (raid_mode == -1) {
-        fprintf(stderr, "Error: No RAID mode specified\n");
-        exit(1);
-    }
-    if (num_disks < 2) {
-        fprintf(stderr, "Error: At least 2 disks are required\n");
-        exit(1);
-    }
-    if (num_inodes <= 0 || num_data_blocks <= 0) {
-        fprintf(stderr, "Error: Invalid number of inodes or data blocks\n");
-        exit(1);
-    }
 }
 
 void initialize_disk(const char *disk, size_t total_size, struct wfs_sb *sb) {
@@ -97,15 +52,15 @@ void initialize_disk(const char *disk, size_t total_size, struct wfs_sb *sb) {
 
 void create_filesystem() {
     // Round up the number of data blocks and inodes to the nearest multiple of 32
-    num_data_blocks = ROUND_UP(num_data_blocks, 32);
-    num_inodes = ROUND_UP(num_inodes, 32);
+    blockNum = ROUND_UP(blockNum, 32);
+    nodeNum = ROUND_UP(nodeNum, 32);
 
     // Align the inode region to block size
-    size_t inodes_size = ROUND_UP(num_inodes * BLOCK_SIZE, BLOCK_SIZE);
+    size_t inodes_size = ROUND_UP(nodeNum * BLOCK_SIZE, BLOCK_SIZE);
 
     // Calculate sizes
-    size_t inode_bitmap_size = (num_inodes + 7) / 8; // Each inode uses 1 bit
-    size_t data_bitmap_size = (num_data_blocks + 7) / 8; // Each block uses 1 bit
+    size_t inode_bitmap_size = (nodeNum + 7) / 8; // Each inode uses 1 bit
+    size_t data_bitmap_size = (blockNum + 7) / 8; // Each block uses 1 bit
     size_t superblock_size = sizeof(struct wfs_sb);
 
     // Calculate offsets
@@ -116,21 +71,21 @@ void create_filesystem() {
     size_t data_blocks_offset = inodes_offset + inodes_size;
 
     // Total filesystem size
-    size_t total_fs_size = data_blocks_offset + (num_data_blocks * BLOCK_SIZE);
+    size_t total_fs_size = data_blocks_offset + (blockNum * BLOCK_SIZE);
 
     struct wfs_sb sb;
     memset(&sb, 0, sizeof(struct wfs_sb));
 
-    sb.num_inodes = num_inodes;
-    sb.num_data_blocks = num_data_blocks;
+    sb.num_inodes = nodeNum;
+    sb.num_data_blocks = blockNum;
 
     sb.i_bitmap_ptr = inode_bitmap_offset;
     sb.d_bitmap_ptr = data_bitmap_offset;
     sb.i_blocks_ptr = inodes_offset;
     sb.d_blocks_ptr = data_blocks_offset;
 
-    sb.raid_mode = raid_mode;
-    sb.num_disks = num_disks;
+    sb.raid_mode = raidNum;
+    sb.num_disks = diskNum;
 
     //printf("Filesystem Layout:\n");
     //printf("  Superblock Offset: %zu bytes\n", superblock_offset);
@@ -143,9 +98,9 @@ void create_filesystem() {
     // Check if total size fits on available disks
     //size_t available_disk_space = num_disks * 1024 * 1024; // Assuming 1MB per disk
     //size_t available_disk_space = 0;
-    for (int i = 0; i < num_disks; i++) {
+    for (int i = 0; i < diskNum; i++) {
         struct stat st;
-        if (stat(disk_files[i], &st) != 0) {
+        if (stat(disks[i], &st) != 0) {
             perror("Error getting disk size");
             exit(-1); // Return 255 if stat fails
         }
@@ -162,10 +117,10 @@ void create_filesystem() {
     //    exit(-1);
     //}
 
-    for (int i = 0; i < num_disks; i++) {
-        initialize_disk(disk_files[i], total_fs_size, &sb);
+    for (int i = 0; i < diskNum; i++) {
+        initialize_disk(disks[i], total_fs_size, &sb);
 
-        int fd = open(disk_files[i], O_RDWR);
+        int fd = open(disks[i], O_RDWR);
         if (fd < 0) {
             perror("Error reopening disk file");
             exit(-1);
@@ -188,7 +143,7 @@ void create_filesystem() {
 
         // Initialize inode table
         struct wfs_inode *inode_table = (struct wfs_inode *)((char *)disk_map + sb.i_blocks_ptr);
-        memset(inode_table, 0, num_inodes * sizeof(struct wfs_inode));
+        memset(inode_table, 0, nodeNum * sizeof(struct wfs_inode));
 
         // Root inode initialization
         inode_table[0].mode = S_IFDIR | 0755;
@@ -211,7 +166,42 @@ void create_filesystem() {
 }
 
 int main(int argc, char *argv[]) {
-    parse_arguments(argc, argv);
+    int opt;
+    raidNum = -1;
+    nodeNum = -1;
+    blockNum = -1;
+    diskNum = 0;
+
+    while ((opt = getopt(argc, argv, "r:d:i:b:")) != -1) {
+        if (opt == 'r'){
+            if (strcmp(optarg, "0") == 0) {
+                raidNum = 0;
+            }
+            else if (strcmp(optarg, "1") == 0) {
+                raidNum = 1;
+            }
+            else if (strcmp(optarg, "1v") == 0) {
+                raidNum = 2;
+            }
+            else {
+                return 1;
+            }
+        }
+        if (opt == 'd'){
+            disks[diskNum++] = optarg;
+        }
+        if (opt == 'i'){
+            nodeNum = atoi(optarg);
+        }
+        if (opt == 'b'){
+            blockNum = atoi(optarg);
+        }
+    }
+
+    //Errors
+    if (raidNum == -1 || diskNum < 2 || nodeNum <= 0 || blockNum <= 0) {
+        return 1;
+    }
     create_filesystem();
     //printf("Filesystem created successfully in RAID mode %d with %d disks.\n", raid_mode, num_disks);
     return 0;

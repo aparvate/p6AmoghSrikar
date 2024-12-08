@@ -19,7 +19,7 @@
 // Global variables
 void *disk_maps[10];  // Memory-mapped disk images
 struct wfs_sb *sb;    // Superblock pointer
-int num_disks;
+int diskNum;
 
 // Helper: Find inode by path
 struct wfs_inode *get_inode_by_path(const char *path, char* disk) {
@@ -78,7 +78,7 @@ int allocate_inode(char *disk) {
             int is_free = 1;  // Assume the inode is free
 
             // Check all disks for the same inode bit
-            for (int d = 0; d < num_disks; d++) {
+            for (int d = 0; d < diskNum; d++) {
                 char *inode_bitmap = (char *)disk_maps[d] + sb->i_bitmap_ptr;
                 if (inode_bitmap[byte] & (1 << bit)) { // If allocated on any disk
                     is_free = 0; // Mark as not free
@@ -88,7 +88,7 @@ int allocate_inode(char *disk) {
 
             if (is_free) { // If the inode is free on all disks
                 // Allocate the inode on all disks
-                for (int d = 0; d < num_disks; d++) {
+                for (int d = 0; d < diskNum; d++) {
                     char *inode_bitmap = (char *)disk_maps[d] + sb->i_bitmap_ptr;
                     inode_bitmap[byte] |= (1 << bit); // Mark allocated
                 }
@@ -140,8 +140,8 @@ int allocate_block(char *disk) {
         // RAID0: Striping across multiple disks
 	printf("RAID 0\n");
         for (int i = 0; i < sb->num_data_blocks; i++) {
-            int disk_index = i % num_disks;                 // Determine the disk for this block
-            int logical_block_num = i / num_disks;          // Block number on the selected disk
+            int disk_index = i % diskNum;                 // Determine the disk for this block
+            int logical_block_num = i / diskNum;          // Block number on the selected disk
             int byte = logical_block_num / 8;               // Byte in the bitmap
             int bit = logical_block_num % 8;                // Bit in the byte
 	    printf("DISK INDEX: %d\n", disk_index);
@@ -232,7 +232,7 @@ static int wfs_mkdir_helper(const char *path, mode_t mode, char *disk) {
     printf("new inode index: %d\n", new_inode_index);
 
     if(sb->raid_mode == 0) {
-   	for(int i = 0; i < num_disks; i++) {
+   	for(int i = 0; i < diskNum; i++) {
 		char *inode_table = ((char *)disk_maps[i] + sb->i_blocks_ptr);
 	        struct wfs_inode *new_inode =(struct wfs_inode *) (inode_table + (new_inode_index * BLOCK_SIZE));
 	        printf("allocating inode at index: %d, disk: %d\n", new_inode_index, i);
@@ -278,9 +278,9 @@ static int wfs_mkdir_helper(const char *path, mode_t mode, char *disk) {
     		}
 	    printf("allocating data block\n");
 	    if(sb->raid_mode == 0) {
-		for(int d = 0; d < num_disks; d++) {
+		for(int d = 0; d < diskNum; d++) {
 		    //int disk_index = block_index % num_disks;
-		    int logical_block_num = block_index / num_disks; 
+		    int logical_block_num = block_index / diskNum; 
 	    	    struct wfs_inode *sync_inode = get_inode_by_path(parent_path, (char *)disk_maps[d]);
 		    sync_inode->blocks[i] = sb->d_blocks_ptr + logical_block_num * BLOCK_SIZE;
 
@@ -324,7 +324,7 @@ static int wfs_mkdir(const char *path, mode_t mode) {
 	if(sb->raid_mode == 0) {
 		wfs_mkdir_helper(path, mode, (char *)disk_maps[0]);
 	} else {
-	for(int i = 0; i < num_disks; i++) {
+	for(int i = 0; i < diskNum; i++) {
 		wfs_mkdir_helper(path, mode, (char *)disk_maps[i]);
 	}	
 	}
@@ -354,7 +354,7 @@ static int wfs_mknod_helper(const char *path, mode_t mode, char *disk) {
     }
 
     if(sb->raid_mode == 0) {
-    	for(int i = 0; i < num_disks; i++) {
+    	for(int i = 0; i < diskNum; i++) {
                 char *inode_table = ((char *)disk_maps[i] + sb->i_blocks_ptr);
                 struct wfs_inode *new_inode =(struct wfs_inode *) (inode_table + (new_inode_index * BLOCK_SIZE));
                 printf("allocating inode at index: %d, disk: %d\n", new_inode_index, i);
@@ -421,7 +421,7 @@ static int wfs_mknod(const char *path, mode_t mode, dev_t rdev) {
     if(sb->raid_mode == 0) {
     	result = wfs_mknod_helper(path, mode, (char *)disk_maps[0]);
     } else {
-    for (int i = 0; i < num_disks; i++) {
+    for (int i = 0; i < diskNum; i++) {
         result = wfs_mknod_helper(path, mode, (char *)disk_maps[i]);
         if (result < 0) {
             // Rollback any partial allocations
@@ -549,8 +549,8 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
 
         if (sb->raid_mode == 0) {
             // RAID 0 Striping
-            disk_index = block_offset % num_disks;      // Determine disk for this block
-            logical_block_num = block_offset / num_disks; // Logical block on the selected disk
+            disk_index = block_offset % diskNum;      // Determine disk for this block
+            logical_block_num = block_offset / diskNum; // Logical block on the selected disk
         } else {
             // Non-RAID or RAID 1 (Mirroring)
             disk_index = 0;          // Default to the first disk
@@ -567,14 +567,14 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
                 }
 
 		if(sb->raid_mode == 0) {
-			for (int i = 0; i < num_disks; i++) {
+			for (int i = 0; i < diskNum; i++) {
 			    char *disk = (char *)disk_maps[i];
                             struct wfs_inode *mirror_inode = (struct wfs_inode *)(disk + sb->i_blocks_ptr + inode->num * BLOCK_SIZE);
                             mirror_inode->blocks[logical_block_num] = sb->d_blocks_ptr + new_block * BLOCK_SIZE;
                         }
 		} else {
                 	// Mirror the allocation across all disks
-                	for (int i = 0; i < num_disks; i++) {
+                	for (int i = 0; i < diskNum; i++) {
                 	    char *disk = (char *)disk_maps[i];
                 	    char *data_bitmap = disk + sb->d_bitmap_ptr;
                 	    data_bitmap[new_block / 8] |= (1 << (new_block % 8));
@@ -595,7 +595,7 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
                 void *block_ptr = (char *)disk_maps[disk_index] + inode->blocks[logical_block_num] + block_start_offset;
                 memcpy(block_ptr, buf + bytes_written, bytes_to_write);
 	    } else {
-            	for (int i = 0; i < num_disks; i++) {
+            	for (int i = 0; i < diskNum; i++) {
             	    char *disk = (char *)disk_maps[i];
             	    void *block_ptr = (char *)disk + inode->blocks[block_offset] + block_start_offset;
             	    memcpy(block_ptr, buf + bytes_written, bytes_to_write);
@@ -618,7 +618,7 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
                 }
 
 		if(sb->raid_mode == 0) {
-			for (int i = 0; i < num_disks; i++) {
+			for (int i = 0; i < diskNum; i++) {
                             char *disk = (char *)disk_maps[i];
 
                             void *indirect_block_ptr = disk + sb->d_blocks_ptr + indirect_block_index * BLOCK_SIZE;
@@ -630,7 +630,7 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
 
 		} else {
                 // Mirror the allocation across all disks
-                	for (int i = 0; i < num_disks; i++) {
+                	for (int i = 0; i < diskNum; i++) {
                 	    char *disk = (char *)disk_maps[i];
                 	    char *data_bitmap = disk + sb->d_bitmap_ptr;
                 	    data_bitmap[indirect_block_index / 8] |= (1 << (indirect_block_index % 8));
@@ -654,7 +654,7 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
                 }
 
 		if(sb->raid_mode == 0) {
-			for (int i = 0; i < num_disks; i++) {
+			for (int i = 0; i < diskNum; i++) {
                             char *disk = (char *)disk_maps[i];
 
                             uint32_t *mirror_indirect_block = (uint32_t *)(disk + inode->blocks[IND_BLOCK]);
@@ -662,7 +662,7 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
                         }
 		} else {
                 // Mirror the allocation across all disks
-                	for (int i = 0; i < num_disks; i++) {
+                	for (int i = 0; i < diskNum; i++) {
                 	    char *disk = (char *)disk_maps[i];
                 	    char *data_bitmap = disk + sb->d_bitmap_ptr;
                 	    data_bitmap[new_block / 8] |= (1 << (new_block % 8));
@@ -685,7 +685,7 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
                 memcpy(block_ptr, buf + bytes_written, bytes_to_write);
 	    }
 	    else {
-	    	for (int i = 0; i < num_disks; i++) {
+	    	for (int i = 0; i < diskNum; i++) {
             	    char *disk = (char *)disk_maps[i];
             	    void *block_ptr = (char *)disk + indirect_block[indirect_offset] + block_start_offset;
             	    memcpy(block_ptr, buf + bytes_written, bytes_to_write);
@@ -699,7 +699,7 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
     }
 
     // Update inode metadata on all disks
-    for (int i = 0; i < num_disks; i++) {
+    for (int i = 0; i < diskNum; i++) {
         char *disk = (char *)disk_maps[i];
         struct wfs_inode *mirror_inode = (struct wfs_inode *)(disk + sb->i_blocks_ptr + inode->num * BLOCK_SIZE);
 
@@ -752,7 +752,7 @@ static int wfs_unlink(const char *path) {
     int file_inode_num = entry->num;
 
     // Step 4: Free data blocks
-    for (int d = 0; d < num_disks; d++) {
+    for (int d = 0; d < diskNum; d++) {
         struct wfs_inode *file_inode = (struct wfs_inode *)((char *)disk_maps[d] + sb->i_blocks_ptr + file_inode_num * BLOCK_SIZE);
 
         for (int i = 0; i < D_BLOCK; i++) {
@@ -789,7 +789,7 @@ static int wfs_unlink(const char *path) {
     }
 
     // Step 5: Remove the directory entry
-    for (int d = 0; d < num_disks; d++) {
+    for (int d = 0; d < diskNum; d++) {
         struct wfs_dentry *dir_entries = (struct wfs_dentry *)((char *)disk_maps[d] + parent_inode->blocks[0]);
         for (int j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
             if (strcmp(dir_entries[j].name, file_name) == 0) {
@@ -800,7 +800,7 @@ static int wfs_unlink(const char *path) {
     }
 
     // Update parent directory metadata across all disks
-    for (int d = 0; d < num_disks; d++) {
+    for (int d = 0; d < diskNum; d++) {
         struct wfs_inode *mirror_parent_inode = (struct wfs_inode *)((char *)disk_maps[d] + sb->i_blocks_ptr + parent_inode->num * BLOCK_SIZE);
         mirror_parent_inode->size -= sizeof(struct wfs_dentry);
         mirror_parent_inode->mtim = time(NULL);
@@ -863,14 +863,14 @@ static int wfs_rmdir(const char *path) {
     }
 
     // Step 5: Free directory blocks and inode
-    for (int d = 0; d < num_disks; d++) {
+    for (int d = 0; d < diskNum; d++) {
         struct wfs_inode *mirror_dir_inode = (struct wfs_inode *)((char *)disk_maps[d] + sb->i_blocks_ptr + dir_inode_num * BLOCK_SIZE);
 
         for (int i = 0; i < D_BLOCK; i++) {
             if (mirror_dir_inode->blocks[i] == 0) continue;
 
             int block_index = (mirror_dir_inode->blocks[i] - sb->d_blocks_ptr) / BLOCK_SIZE;
-            if (sb->raid_mode == 0 && block_index % num_disks != d) continue; // Skip non-relevant disks for RAID 0
+            if (sb->raid_mode == 0 && block_index % diskNum != d) continue; // Skip non-relevant disks for RAID 0
 
             char *data_bitmap = (char *)disk_maps[d] + sb->d_bitmap_ptr;
             data_bitmap[block_index / 8] &= ~(1 << (block_index % 8));
@@ -884,7 +884,7 @@ static int wfs_rmdir(const char *path) {
     }
 
     // Step 6: Remove the directory entry from the parent directory
-    for (int d = 0; d < num_disks; d++) {
+    for (int d = 0; d < diskNum; d++) {
         struct wfs_dentry *dir_entries = (struct wfs_dentry *)((char *)disk_maps[d] + parent_inode->blocks[0]);
         for (int j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
             if (strcmp(dir_entries[j].name, dir_name) == 0) {
@@ -895,7 +895,7 @@ static int wfs_rmdir(const char *path) {
     }
 
     // Step 7: Update parent directory metadata across all disks
-    for (int d = 0; d < num_disks; d++) {
+    for (int d = 0; d < diskNum; d++) {
         struct wfs_inode *mirror_parent_inode = (struct wfs_inode *)((char *)disk_maps[d] + sb->i_blocks_ptr + parent_inode->num * BLOCK_SIZE);
         mirror_parent_inode->size -= sizeof(struct wfs_dentry);
         mirror_parent_inode->mtim = time(NULL);
@@ -922,14 +922,14 @@ int main(int argc, char *argv[]) {
     }
 
     // Identify the number of disks (all arguments before FUSE options or mount point)
-    num_disks = 0;
+    diskNum = 0;
     for (int i = 1; i < argc; i++) {
         if (argv[i][0] == '-') break; // Stop at FUSE options
-        num_disks++;
+        diskNum++;
     }
 
     // Initialize disk maps
-    for (int i = 0; i < num_disks; i++) {
+    for (int i = 0; i < diskNum; i++) {
 //        printf("Attempting to open: %s\n", argv[i + 1]);
         int fd = open(argv[i + 1], O_RDWR);
         if (fd < 0) {
@@ -959,6 +959,6 @@ int main(int argc, char *argv[]) {
 
     printf("here\n");
     // Pass remaining arguments to FUSE
-    return fuse_main(argc - num_disks, &argv[num_disks], &ops, NULL);
+    return fuse_main(argc - diskNum, &argv[diskNum], &ops, NULL);
 }
 
