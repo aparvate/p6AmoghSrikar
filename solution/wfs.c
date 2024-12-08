@@ -993,7 +993,7 @@ int main(int argc, char *argv[]) {
         close(fileDescs[i]);
     }
 
-    free(disks);
+    //free(disks);
     free(fileDescs);
 
     return rc;
