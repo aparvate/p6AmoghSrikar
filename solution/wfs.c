@@ -123,10 +123,10 @@ struct allocInts allocate_data_block(struct wfs_inode* parentInode) {
       // Debug: Print which block we're checking
       printf("Checking block %d\n", parentInode->num);
       
-      char *blockAddr = (char*)disks[j] + superblock->d_blocks_ptr + parentInode->blocks[i] * BLOCK_SIZE;
-      printf("Block Address: block pointer: %zd, block in node: %zd\n", superblock->d_blocks_ptr, parentInode->blocks[i]);
-      struct wfs_dentry *entries = (struct wfs_dentry*)blockAddr;
       for (int i = 0; i < D_BLOCK; i ++){
+        char *blockAddr = (char*)disks[0] + superblock->d_blocks_ptr + parentInode->blocks[i] * BLOCK_SIZE;
+        printf("Block Address: block pointer: %zd, block in node: %zd\n", superblock->d_blocks_ptr, parentInode->blocks[i]);
+        struct wfs_dentry *entries = (struct wfs_dentry*)blockAddr;
         for (int k = 0; k * sizeof(struct wfs_dentry) < BLOCK_SIZE; k++){
           printf("Dentry number: %d\n", k);
           printf("Dentry->num: %d\n", entries[k].num);
