@@ -178,30 +178,42 @@ static int allocate_inode() {
 }
 
 static int add_parent_dir_entry(off_t parentIdx, const char *name, off_t newIdx) {
+    printf("Entering parent dentry adding\n");
+    printf("Path: %s\n", name);
+    printf("Parent ID: %zd\n", parentIdx);
+    printf("New ID: %zd\n", newIdx);
     struct wfs_inode *parentInode = get_inode(parentIdx);
     
     // Calculate how many entries are currently in the directory
     size_t current_entries = parentInode->size / sizeof(struct wfs_dentry);
     size_t entries_per_block = BLOCK_SIZE / sizeof(struct wfs_dentry);
+    printf("Current entries in parent: %zd\n", current_entries);
+    printf("Entries per block: %zd\n", entries_per_block);
     
     // Calculate which block we need and the offset within that block
     size_t block_idx = current_entries / entries_per_block;
     size_t entry_offset = current_entries % entries_per_block;
+    printf("Which block needed: %zd\n", block_idx);
+    printf("Entry offset: %zd\n", entry_offset);
     
     // Check if we need a new block
     if (block_idx >= N_BLOCKS) {
+        printf("No new blocks available\n");
         return -ENOSPC;  // No more blocks available
     }
     
     // Allocate new block if needed
     bool is_new_block = false;
+    printf("Need new block\n");
     if (parentInode->blocks[block_idx] == 0) {
         int newBlock = allocate_data_block();
         if (newBlock < 0) {
+            printf("New block not allocated\n");
             return newBlock;
         }
         parentInode->blocks[block_idx] = newBlock;
         is_new_block = true;
+        printf("New block found\n");
     }
     
     // Only zero out the block if it's newly allocated
@@ -214,6 +226,7 @@ static int add_parent_dir_entry(off_t parentIdx, const char *name, off_t newIdx)
     }
     
     // Create the new directory entry
+    printf("Creating new directory entry\n");
     struct wfs_dentry newEntry;
     strncpy(newEntry.name, name, MAX_NAME - 1);
     newEntry.name[MAX_NAME - 1] = '\0';
@@ -221,27 +234,32 @@ static int add_parent_dir_entry(off_t parentIdx, const char *name, off_t newIdx)
     
     // Write the new entry to all disks
     for (int disk = 0; disk < superblock->num_disks; disk++) {
-        // Calculate entry position in this disk
-        char *blockAddr = (char*)disks[disk] + superblock->d_blocks_ptr + 
-                         parentInode->blocks[block_idx] * BLOCK_SIZE;
-        struct wfs_dentry *entries = (struct wfs_dentry*)blockAddr;
-        
-        // Write the new entry at the correct offset without disturbing existing entries
-        memcpy(&entries[entry_offset], &newEntry, sizeof(struct wfs_dentry));
+      printf("Disk: %d\n", disk);
+      // Calculate entry position in this disk
+      char *blockAddr = (char*)disks[disk] + superblock->d_blocks_ptr + 
+                        parentInode->blocks[block_idx] * BLOCK_SIZE;
+      struct wfs_dentry *entries = (struct wfs_dentry*)blockAddr;
+      
+      // Write the new entry at the correct offset without disturbing existing entries
+      memcpy(&entries[entry_offset], &newEntry, sizeof(struct wfs_dentry));
+      printf("Mem-copied\n");
     }
     
     // Update parent inode
+    printf("Updating parent Inode\n");
     parentInode->size += sizeof(struct wfs_dentry);
     parentInode->nlinks++;
     
     // Write updated inode to all disks
     for (int disk = 0; disk < superblock->num_disks; disk++) {
-        struct wfs_inode *diskInode = (struct wfs_inode*)
-            ((char*)disks[disk] + superblock->i_blocks_ptr + parentIdx * BLOCK_SIZE);
-        memcpy(diskInode, parentInode, sizeof(struct wfs_inode));
-        msync(disks[disk], diskSize, MS_SYNC);
+      printf("Writing updated inode to disk %d\n", disk);
+      struct wfs_inode *diskInode = (struct wfs_inode*)
+          ((char*)disks[disk] + superblock->i_blocks_ptr + parentIdx * BLOCK_SIZE);
+      memcpy(diskInode, parentInode, sizeof(struct wfs_inode));
+      msync(disks[disk], diskSize, MS_SYNC);
     }
     
+    printf("Finished adding dentry to parent %d\n");
     return 0;
 }
 
