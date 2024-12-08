@@ -27,7 +27,7 @@ static int num_disks;
 static int *fileDescs;
 size_t diskSize;
 //static char* blocks;
-struct allocInts = {
+struct allocInts {
   int returnInt;
   int isUsed;
 }
