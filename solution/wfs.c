@@ -428,15 +428,15 @@ static int wfs_mknod(const char *path, mode_t mode, dev_t dev) {
     inode.gid = getgid();
     inode.atim = inode.mtim = inode.ctim = time(NULL);
     inode.size = 0;
-    int firstBlock = allocate_data_block(parentInode);
-    if (firstBlock >= 0) {
-        memset((disks[0] + superblock->d_blocks_ptr + firstBlock * BLOCK_SIZE), 0, BLOCK_SIZE);
-        inode.blocks[0] = firstBlock;
-    }
-    else
-    {
-        printf("wfs_mknod: BAD FIRST BLOCK\n");
-    }
+    // int firstBlock = allocate_data_block(parentInode);
+    // if (firstBlock >= 0) {
+    //     memset((disks[0] + superblock->d_blocks_ptr + firstBlock * BLOCK_SIZE), 0, BLOCK_SIZE);
+    //     inode.blocks[0] = firstBlock;
+    // }
+    // else
+    // {
+    //     printf("wfs_mknod: BAD FIRST BLOCK\n");
+    // }
     write_inode(child_idx, &inode);
 
     add_parent_dir_entry(parentInode, childPath, child_idx);
