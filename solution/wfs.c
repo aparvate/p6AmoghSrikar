@@ -109,7 +109,7 @@ struct wfs_inode* get_inode(off_t index) {
 
 static int allocate_data_block() {
     printf("Entering allocate_data_block\n");
-    printf("Num of blocks: %d\n", superblock->num_data_blocks);
+    printf("Num of blocks: %zd\n", superblock->num_data_blocks);
     for (int i = 0; i < superblock->num_data_blocks; i++) {
         // Track if the block is free across all disks
         int is_free = 1;
