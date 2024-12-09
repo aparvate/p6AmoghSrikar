@@ -405,13 +405,9 @@ static int wfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_
     printf("readdir called for path: %s\n", path);
 
     // Validate and retrieve the inode
-    struct wfs_inode *inode = get_inode(path, disk);
-    if (!inode) {
+    struct wfs_inode *inode = get_inode(path, (char*))disks[0]);
+    if (!inode || !(inode->mode & S_IFDIR)) {
         return -ENOENT; // Directory not found or invalid
-    }
-    if (!(inode->mode & S_IFDIR)) {
-        printf("Path is not a directory: %s\n", path);
-        return NULL;
     }
 
     // Fill standard entries for "." and ".."
