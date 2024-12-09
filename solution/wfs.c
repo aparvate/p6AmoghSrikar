@@ -41,17 +41,13 @@ struct wfs_inode *get_inode(const char *path, char* disk) {
         bool found = false;
         for (int i = 0; i < D_BLOCK; i++) {
             off_t blockStart = currInode->blocks[i];
-            if (blockStart == 0) {
-                break;
-            }
-            else{
-                struct wfs_dentry *dentry = (struct wfs_dentry *)((char *)disks[0] + blockStart);
-                for (int j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
-                    if (strcmp(dentry[j].name, token) == 0) {
-                        currInode = (struct wfs_inode *)(inode_table + (dentry[j].num * BLOCK_SIZE));
-                        found = true;
-                        break;
-                    }
+            if (blockStart == 0) {break;}
+            struct wfs_dentry *dentry = (struct wfs_dentry *)((char *)disks[0] + blockStart);
+            for (int j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
+                if (strcmp(dentry[j].name, token) == 0) {
+                    currInode = (struct wfs_inode *)(inode_table + (dentry[j].num * BLOCK_SIZE));
+                    found = true;
+                    break;
                 }
             }
             if (found) break;
