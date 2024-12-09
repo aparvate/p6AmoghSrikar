@@ -148,26 +148,26 @@ static int wfs_getattr(const char *path, struct stat *stbuf) {
 
     struct wfs_inode *inode = get_inode(path, (char *)disks[0]);
     if (!inode) {
-        return -ENOENT;  // File or directory not found
+        return -ENOENT;
     }
 
-    stbuf->st_mode = inode->mode;    // File mode
-    stbuf->st_nlink = inode->nlinks; // Number of links
-    stbuf->st_uid = inode->uid;      // User ID
-    stbuf->st_gid = inode->gid;      // Group ID
-    stbuf->st_size = inode->size;    // File size
-    stbuf->st_atime = inode->atim;   // Last access time
-    stbuf->st_mtime = inode->mtim;   // Last modification time
-    stbuf->st_ctime = inode->ctim;   // Last status change time
+    stbuf->st_mode = inode->mode;
+    stbuf->st_nlink = inode->nlinks;
+    stbuf->st_uid = inode->uid;
+    stbuf->st_gid = inode->gid;
+    stbuf->st_size = inode->size;
+    stbuf->st_atime = inode->atim;
+    stbuf->st_mtime = inode->mtim;
+    stbuf->st_ctime = inode->ctim;
 
     return SUCCEED;
 }
 
 
 // Parse the path into parent directory path and new directory name
-static void parse_path(const char *path, char *parent_path, char *new_name) {
-    strncpy(parent_path, path, sizeof(parent_path) - 1);
-    parent_path[sizeof(parent_path) - 1] = '\0';
+static void parse_path(const char *path, char *parent_path, char *new_name, size_t size) {
+    strncpy(parent_path, path, size - 1);
+    parent_path[size - 1] = '\0';
     char *slash = strrchr(parent_path, '/');
 
     if (!slash || slash == parent_path) {
@@ -252,7 +252,7 @@ static int wfs_mkdir_helper(const char *path, mode_t mode, char *disk) {
     printf("mkdir callback\n");
 
     char parent_path[1024], new_name[MAX_NAME];
-    parse_path(path, parent_path, new_name);
+    parse_path(path, parent_path, new_name, sizeof(parent_path));
 
     // Fetch the parent inode
     struct wfs_inode *parent_inode = get_inode(parent_path, disk);
@@ -356,7 +356,7 @@ static int add_file_entry(struct wfs_inode *parent_inode, const char *parent_pat
 // Helper function for wfs_mknod
 static int wfs_mknod_helper(const char *path, mode_t mode, char *disk) {
     char parent_path[1024], new_name[MAX_NAME];
-    parse_path(path, parent_path, new_name);
+    parse_path(path, parent_path, new_name, sizeof(parent_path));
 
     // Fetch the parent inode
     struct wfs_inode *parent_inode = get_inode(parent_path, disk);
