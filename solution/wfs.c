@@ -28,7 +28,7 @@ struct wfs_dentry* get_dentry(void* disk, off_t block) {
     return (struct wfs_dentry *)((char *)disk + block);
 }
 
-char* get_bitmap(void* disk, off_t block) {
+char* get_bit_inode(void* disk, off_t block) {
     return (char *)((char *)disk + block);
 }
 
@@ -79,8 +79,9 @@ int allocate_inode(char *disk) {
 
             // Check all disks for the same inode bit
             for (int d = 0; d < diskNum; d++) {
-                char *inode_bitmap = get_bitmap(disks[d], superblock->i_bitmap_ptr);
-                if (inode_bitmap[i / 8] & (1 << (i % 8))) { // If allocated on any disk
+                char *inode_bitmap = get_bit_inode(disks[d], superblock->i_bitmap_ptr);
+                //((char *)disks[d] + superblock->i_bitmap_ptr);
+                if (((char *)disks[d] + superblock->i_bitmap_ptr)[i / 8] & (1 << (i % 8))) { // If allocated on any disk
                     is_free = 0; // Mark as not free
                     break;
                 }
@@ -89,7 +90,8 @@ int allocate_inode(char *disk) {
             if (is_free) { // If the inode is free on all disks
                 // Allocate the inode on all disks
                 for (int d = 0; d < diskNum; d++) {
-                    char *inode_bitmap = get_bitmap(disks[d], superblock->i_bitmap_ptr);
+                    char *inode_bitmap = get_bit_inode(disks[d], superblock->i_bitmap_ptr);
+                    //(char *)disks[d] + superblock->i_bitmap_ptr;
                     inode_bitmap[i / 8] |= (1 << (i % 8)); // Mark allocated
                 }
                 return i; // Return the inode number
@@ -97,7 +99,8 @@ int allocate_inode(char *disk) {
         }
     } else {
         // Standard (non-RAID 0) Mode
-        char *inode_bitmap = get_bitmap((void*)disk, superblock->i_bitmap_ptr);
+        char *inode_bitmap = get_bit_inode((void*)disk, superblock->i_bitmap_ptr);
+        //disk + superblock->i_bitmap_ptr;
         for (int i = 0; i < superblock->num_inodes; i++) {
             if (!(inode_bitmap[i / 8] & (1 << (i % 8)))) { // Free inode
                 inode_bitmap[i / 8] |= (1 << (i % 8));    // Mark allocated
@@ -140,8 +143,7 @@ int allocate_block(char *disk) {
         }
     } else {
         // RAID 1 or no RAID: Allocate using standard logic
-        char *data_bitmap = get_bitmap((void*)disk, superblock->i_bitmap_ptr);
-        //disk + superblock->d_bitmap_ptr;
+        char *data_bitmap = disk + superblock->d_bitmap_ptr;
         for (int i = 0; i < superblock->num_data_blocks; i++) {
             if (!(data_bitmap[i / 8] & (1 << (i % 8)))) { // Free block
                 data_bitmap[i / 8] |= (1 << (i % 8));     // Mark allocated
