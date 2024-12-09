@@ -23,7 +23,6 @@ struct wfs_sb *superblock;
 int diskNum;
 size_t diskSize;
 static int *fileDescs;
-int raid_mode;
 
 struct wfs_dentry* get_dentry(void* disk, off_t block) {
     return (struct wfs_dentry *)((char *)disk + block);
@@ -73,7 +72,7 @@ struct wfs_inode *get_inode(const char *path, char* disk) {
 }
 
 int allocate_inode(char *disk) {
-    if (raid_mode == 0) { // RAID 0 Mode
+    if (superblock->raid_mode == 0) { // RAID 0 Mode
         int is_free = 1;  // Inode starts free
         for (int i = 0; i < superblock->num_inodes; i++) {
             is_free = 1;
@@ -111,14 +110,16 @@ int allocate_inode(char *disk) {
 }
 
 int allocate_block(char *disk) {
-    printf("RAID MODE: %d\n", raid_mode);
+    printf("RAID MODE: %d\n", superblock->raid_mode);
     // RAID 0
-    if (raid_mode == 0) {
+    if (superblock->raid_mode == 0) {
         for (int i = 0; i < superblock->num_data_blocks; i++) {
             uint8_t *currBitmap = (uint8_t *)disks[i % diskNum] + superblock->d_bitmap_ptr;
 
             if (!(currBitmap[((i / diskNum) / 8)] & (1 << ((i / diskNum) % 8)))) {
                 currBitmap[((i / diskNum) / 8)] |= (1 << ((i / diskNum) % 8));
+
+                // Zeroing out the newly allocated block
                 char *blockPointer = (char *)disks[i % diskNum] + superblock->d_blocks_ptr + ((i / diskNum) * BLOCK_SIZE);
                 char newBlock[BLOCK_SIZE];
                 memset(newBlock, 0, BLOCK_SIZE);
@@ -191,7 +192,7 @@ static int wfs_mkdir_helper(const char *path, mode_t mode, char *disk) {
     }
     printf("new inode index: %d\n", new_inode_index);
 
-    if(raid_mode == 0) {
+    if(superblock->raid_mode == 0) {
    	for(int i = 0; i < diskNum; i++) {
 		char *inode_table = ((char *)disks[i] + superblock->i_blocks_ptr);
 	        struct wfs_inode *new_inode =(struct wfs_inode *) (inode_table + (new_inode_index * BLOCK_SIZE));
@@ -237,7 +238,7 @@ static int wfs_mkdir_helper(const char *path, mode_t mode, char *disk) {
         		return block_index;  // Propagate ENOSPC
     		}
 	    printf("allocating data block\n");
-	    if(raid_mode == 0) {
+	    if(superblock->raid_mode == 0) {
 		for(int d = 0; d < diskNum; d++) {
 		    //int disk_index = block_index % num_disks;
 		    int logical_block_num = block_index / diskNum; 
@@ -282,7 +283,7 @@ static int wfs_mkdir_helper(const char *path, mode_t mode, char *disk) {
 }
 
 static int wfs_mkdir(const char *path, mode_t mode) {
-	if(raid_mode == 0) {
+	if(superblock->raid_mode == 0) {
 		wfs_mkdir_helper(path, mode, (char *)disks[0]);
 	} else {
 	for(int i = 0; i < diskNum; i++) {
@@ -314,7 +315,7 @@ static int wfs_mknod_helper(const char *path, mode_t mode, char *disk) {
         return -ENOSPC;  // No free inodes
     }
 
-    if(raid_mode == 0) {
+    if(superblock->raid_mode == 0) {
     	for(int i = 0; i < diskNum; i++) {
                 char *inode_table = ((char *)disks[i] + superblock->i_blocks_ptr);
                 struct wfs_inode *new_inode =(struct wfs_inode *) (inode_table + (new_inode_index * BLOCK_SIZE));
@@ -380,7 +381,7 @@ static int wfs_mknod_helper(const char *path, mode_t mode, char *disk) {
 static int wfs_mknod(const char *path, mode_t mode, dev_t rdev) {
 
     int result = 0;
-    if(raid_mode == 0) {
+    if(superblock->raid_mode == 0) {
     	result = wfs_mknod_helper(path, mode, (char *)disks[0]);
     } else {
     for (int i = 0; i < diskNum; i++) {
@@ -511,7 +512,7 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
     while (bytes_written < size) {
 	int disk_index, logical_block_num;
 
-        if (raid_mode == 0) {
+        if (superblock->raid_mode == 0) {
             // RAID 0 Striping
             disk_index = block_offset % diskNum;      // Determine disk for this block
             logical_block_num = block_offset / diskNum; // Logical block on the selected disk
@@ -530,7 +531,7 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
                     return -ENOSPC; // No space available
                 }
 
-		if(raid_mode == 0) {
+		if(superblock->raid_mode == 0) {
 			for (int i = 0; i < diskNum; i++) {
 			    char *disk = (char *)disks[i];
                             struct wfs_inode *mirror_inode = (struct wfs_inode *)(disk + superblock->i_blocks_ptr + inode->num * BLOCK_SIZE);
@@ -555,7 +556,7 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
                                         ? size - bytes_written
                                         : block_available_space;
 
-	    if(raid_mode == 0) {
+	    if(superblock->raid_mode == 0) {
                 void *block_ptr = (char *)disks[disk_index] + inode->blocks[logical_block_num] + block_start_offset;
                 memcpy(block_ptr, buf + bytes_written, bytes_to_write);
 	    } else {
@@ -581,7 +582,7 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
                     return -ENOSPC; // No space available
                 }
 
-		if(raid_mode == 0) {
+		if(superblock->raid_mode == 0) {
 			for (int i = 0; i < diskNum; i++) {
                             char *disk = (char *)disks[i];
 
@@ -617,7 +618,7 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
                     return -ENOSPC; // No space available
                 }
 
-		if(raid_mode == 0) {
+		if(superblock->raid_mode == 0) {
 			for (int i = 0; i < diskNum; i++) {
                             char *disk = (char *)disks[i];
 
@@ -643,7 +644,7 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
                                         ? size - bytes_written
                                         : block_available_space;
 
-	    if(raid_mode == 0) {
+	    if(superblock->raid_mode == 0) {
 		char *disk = (char *)disks[disk_index];
                 void *block_ptr = (char *)disk + indirect_block[indirect_offset] + block_start_offset;
                 memcpy(block_ptr, buf + bytes_written, bytes_to_write);
@@ -834,7 +835,7 @@ static int wfs_rmdir(const char *path) {
     //         if (mirror_dir_inode->blocks[i] == 0) continue;
 
     //         int block_index = (mirror_dir_inode->blocks[i] - superblock->d_blocks_ptr) / BLOCK_SIZE;
-    //         if (raid_mode == 0 && block_index % diskNum != d) continue; // Skip non-relevant disks for RAID 0
+    //         if (superblock->raid_mode == 0 && block_index % diskNum != d) continue; // Skip non-relevant disks for RAID 0
 
     //         char *data_bitmap = (char *)disks[d] + superblock->d_bitmap_ptr;
     //         data_bitmap[block_index / 8] &= ~(1 << (block_index % 8));
@@ -920,7 +921,6 @@ int main(int argc, char *argv[]) {
     diskNum = superblock->num_disks;
     int f_argc = argc - diskNum;
     char **f_argv = argv + diskNum;
-    raid_mode = superblock->raid_mode;
 
     //printf("Argument: %d\n", f_argc);
     //for (int i = 0; i < f_argc; i++) {
