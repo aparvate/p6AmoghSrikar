@@ -466,9 +466,32 @@ static int wfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_
     return SUCCEED; // Directory read successfully
 }
 
+// Helper to fetch a data block for reading
+static void *get_data_block(struct wfs_inode *inode, size_t block_offset) {
+    if (block_offset < D_BLOCK) { // Handle direct blocks
+        if (inode->blocks[block_offset] == 0) {
+            return NULL; // No more data
+        }
+        return (char *)disks[0] + inode->blocks[block_offset];
+    }
 
+    // Handle indirect blocks
+    size_t indirect_offset = block_offset - D_BLOCK;
+    if (inode->blocks[IND_BLOCK] == 0) {
+        return NULL; // No indirect blocks
+    }
+
+    uint32_t *indirect_block = (uint32_t *)((char *)disks[0] + inode->blocks[IND_BLOCK]);
+    if (indirect_block[indirect_offset] == 0) {
+        return NULL; // No more data
+    }
+
+    return (char *)disks[0] + indirect_block[indirect_offset];
+}
+
+// Main file read implementation
 static int wfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
-    // Find the inode for the file
+    // Retrieve the inode for the file
     struct wfs_inode *inode = get_inode(path, (char *)disks[0]);
     if (!inode) {
         return -ENOENT; // File not found
@@ -478,48 +501,30 @@ static int wfs_read(const char *path, char *buf, size_t size, off_t offset, stru
         return -EISDIR; // Cannot read a directory
     }
 
-    size_t bytes_read = 0;               // Track bytes read
-    size_t block_offset = offset / BLOCK_SIZE;  // Determine starting block
+    size_t bytes_read = 0;              // Total bytes read
+    size_t block_offset = offset / BLOCK_SIZE;  // Starting block index
     size_t block_start_offset = offset % BLOCK_SIZE; // Offset within the block
 
-    while (bytes_read < size && block_offset < D_BLOCK + (BLOCK_SIZE / sizeof(uint32_t))) {
-        void *data_block = NULL;
-
-        // Handle direct blocks
-        if (block_offset < D_BLOCK) {
-            if (inode->blocks[block_offset] == 0) {
-                break; // No more data
-            }
-            data_block = (char *)disks[0] + inode->blocks[block_offset];
-        }
-        // Handle indirect blocks
-        else {
-            size_t indirect_offset = block_offset - D_BLOCK;
-
-            if (inode->blocks[IND_BLOCK] == 0) {
-                break; // No indirect blocks
-            }
-
-            uint32_t *indirect_block = (uint32_t *)((char *)disks[0] + inode->blocks[IND_BLOCK]);
-            if (indirect_block[indirect_offset] == 0) {
-                break; // No more data
-            }
-            data_block = (char *)disks[0] + indirect_block[indirect_offset];
+    while (bytes_read < size) {
+        void *data_block = get_data_block(inode, block_offset);
+        if (!data_block) {
+            break; // No more data to read
         }
 
-        // Read from the block
+        // Determine how much data can be read from the current block
         size_t block_available_space = BLOCK_SIZE - block_start_offset;
         size_t bytes_to_read = (size - bytes_read < block_available_space)
                                    ? size - bytes_read
                                    : block_available_space;
 
+        // Read data from the block
         memcpy(buf + bytes_read, (char *)data_block + block_start_offset, bytes_to_read);
         bytes_read += bytes_to_read;
         block_offset++;
         block_start_offset = 0; // Reset offset for subsequent blocks
     }
 
-    return bytes_read; // Return the total number of bytes read
+    return bytes_read; // Return the total bytes read
 }
 
 static int wfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
