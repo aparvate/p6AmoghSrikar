@@ -1,14 +1,19 @@
 
 #define FUSE_USE_VERSION 30
-#include <fuse.h>
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/mman.h>
-#include <time.h>
+#include "stdio.h"
+#include "unistd.h"
+#include "stdlib.h"
+#include "string.h"
+#include "fcntl.h"
+#include "sys/stat.h"
+#include "sys/types.h"
+#include "sys/mman.h"
+#include "time.h"
+#include "getopt.h"
+#include "fuse.h"
+#include "errno.h"
 #include "wfs.h"
+#include "stdbool.h"
 
 #define SUCCEED 0
 #define ERROR -1
