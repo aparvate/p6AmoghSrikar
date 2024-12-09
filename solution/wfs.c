@@ -552,9 +552,9 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
             }
             bSpace = BLOCK_SIZE - bStart;
             if (size - bytes < bSpace)
-                bytesWrite = size - bytes
+                bytesWrite = size - bytes;
             else
-                bytesWrite = bSpace
+                bytesWrite = bSpace;
 
             write_to_block(buf, bytes, bytesWrite, bStart, inode->blocks[logical_block_num], disk_index);
         }
@@ -574,9 +574,9 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
             }
             bSpace = BLOCK_SIZE - bStart;
             if (size - bytes < bSpace)
-                bytesWrite = size - bytes
+                bytesWrite = size - bytes;
             else
-                bytesWrite = bSpace
+                bytesWrite = bSpace;
 
             write_to_block(buf, bytes, bytesWrite, bStart, indirect_block[indirect_offset], disk_index);
         }
