@@ -67,14 +67,6 @@ struct wfs_inode *get_inode(const char *path, char* disk) {
     return inode;
 }
 
-void check_inode() {
-    char *inode_bitmap = (char *)disks[0] + superblock->i_bitmap_ptr;
-    for (int i = 0; i < superblock->num_inodes; i++) {
-        printf("inode at %d: %d\n", i, (inode_bitmap[i / 8] & (0x1 << (i % 8))));
-    }
-}
-
-
 int allocate_inode(char *disk) {
     if (superblock->raid_mode == 0) { // RAID 0 Mode
         // Iterate through all possible inodes to find a free one
