@@ -431,56 +431,40 @@ static void *get_data_block(struct wfs_inode *inode, size_t block_offset) {
     return (char *)disks[0] + indirect_block[block_offset - D_BLOCK];
 }
 
-// Main file read implementation
 static int wfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
-    // Retrieve the inode for the file
     struct wfs_inode *inode = get_inode(path, (char *)disks[0]);
     if (!inode) {
         return -ENOENT; // File not found
     }
-
-    // if (!S_ISREG(inode->mode)) {
-    //     return -EISDIR; // Cannot read a directory
-    // }
     if ((inode->mode & S_IFDIR)) {
         printf("Cannot read\n");
         return -EISDIR; // Not a directory
     }
 
-    size_t bytes_read = 0;              // Total bytes read
+    size_t bytes_read = 0;
     size_t block_offset = offset / BLOCK_SIZE;  // Starting block index
     size_t block_start_offset = offset % BLOCK_SIZE; // Offset within the block
 
     while (bytes_read < size) {
         void *data_block = get_data_block(inode, block_offset);
-        if (!data_block) {
-            break; // No more data to read
-        }
-
-        // Determine how much data can be read from the current block
+        if (!data_block) 
+            break;
         size_t block_available_space = BLOCK_SIZE - block_start_offset;
-        size_t bytes_to_read = (size - bytes_read < block_available_space)
-                                   ? size - bytes_read
-                                   : block_available_space;
-
-        // Read data from the block
+        size_t bytes_to_read = (size - bytes_read < block_available_space) ? size - bytes_read : block_available_space;
         memcpy(buf + bytes_read, (char *)data_block + block_start_offset, bytes_to_read);
         bytes_read += bytes_to_read;
         block_offset++;
-        block_start_offset = 0; // Reset offset for subsequent blocks
+        block_start_offset = 0;
     }
 
-    return bytes_read; // Return the total bytes read
+    return bytes_read;
 }
 
-// Helper to allocate a new block and update inode's direct block mapping
 static int allocate_and_map_direct_block(struct wfs_inode *inode, int block_offset, int disk_index, int logical_block_num) {
     int new_block = allocate_block((char *)disks[disk_index]);
     if (new_block < 0) {
-        return -ENOSPC; // No space available
+        return -ENOSPC;
     }
-
-    // Update block mapping across disks
     if (superblock->raid_mode == 0) {
         for (int i = 0; i < diskNum; i++) {
             char *disk = (char *)disks[i];
@@ -490,9 +474,8 @@ static int allocate_and_map_direct_block(struct wfs_inode *inode, int block_offs
     } else {
         for (int i = 0; i < diskNum; i++) {
             char *disk = (char *)disks[i];
-            char *data_bitmap = disk + superblock->d_bitmap_ptr;
-            data_bitmap[new_block / 8] |= (1 << (new_block % 8));
-
+            // char *data_bitmap = ((char*)(disk + superblock->d_bitmap_ptr));
+            ((char*)(disk + superblock->d_bitmap_ptr))[new_block / 8] |= (1 << (new_block % 8));
             struct wfs_inode *mirror_inode = (struct wfs_inode *)(disk + superblock->i_blocks_ptr + inode->num * BLOCK_SIZE);
             mirror_inode->blocks[block_offset] = superblock->d_blocks_ptr + new_block * BLOCK_SIZE;
         }
@@ -555,10 +538,6 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
     if (!inode) {
         return -ENOENT; // File not found
     }
-
-    // if (!S_ISREG(inode->mode)) {
-    //     return -EISDIR; // Cannot write to a directory
-    // }
     if ((inode->mode & S_IFDIR)) {
         printf("Cannot read\n");
         return -EISDIR; // Not a directory
