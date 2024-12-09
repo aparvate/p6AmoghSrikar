@@ -120,7 +120,7 @@ int allocate_block(char *disk) {
                 currBitmap[((i / diskNum) / 8)] |= (1 << ((i / diskNum) % 8));
 
                 // Zeroing out the newly allocated block
-                char *block_ptr = (char *)disks[disk_index] + superblock->d_blocks_ptr + (logical_block_num * BLOCK_SIZE);
+                char *block_ptr = (char *)disks[i % diskNum] + superblock->d_blocks_ptr + ((i / diskNum) * BLOCK_SIZE);
                 char zero_block[BLOCK_SIZE];
                 memset(zero_block, 0, BLOCK_SIZE);
                 memcpy(block_ptr, zero_block, BLOCK_SIZE);
