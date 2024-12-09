@@ -111,31 +111,6 @@ int allocate_inode(char *disk) {
     return -ENOSPC; // No free inodes
 }
 
-
-//int allocate_inode(char *disk) {
-//	// synchronize across disks if raid 0
-//    if(sb->raid_mode == 0) {
-//	    for(int i = 0; i < num_disks; i++){
-//    		char *inode_bitmap = (char *)disk_maps[i] + sb->i_bitmap_ptr;
-//    		for (int i = 0; i < sb->num_inodes; i++) { 
-//    		    if (!(inode_bitmap[i / 8] & (1 << (i % 8)))) { // Free inode
-//    		        inode_bitmap[i / 8] |= (1 << (i % 8));    // Mark allocated
-//    		        return i;
-//    		    }
-//    		}
-//	    }
-//    } else {
-//    	char *inode_bitmap = disk + sb->i_bitmap_ptr;
-//    	for (int i = 0; i < sb->num_inodes; i++) {
-//    	    if (!(inode_bitmap[i / 8] & (1 << (i % 8)))) { // Free inode
-//    	        inode_bitmap[i / 8] |= (1 << (i % 8));    // Mark allocated
-//    	        return i;
-//    	    }
-//    	}
-//    }
-//    return -ENOSPC;  // No free inodes
-//}
-
 int allocate_block(char *disk) {
     printf("RAID MODE: %d\n", superblock->raid_mode);
     if (superblock->raid_mode == 0) { // RAID 0 Mode
