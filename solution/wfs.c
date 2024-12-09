@@ -74,6 +74,47 @@ void check_inode() {
     }
 }
 
+
+int allocate_inode(char *disk) {
+    if (superblock->raid_mode == 0) { // RAID 0 Mode
+        // Iterate through all possible inodes to find a free one
+        for (int i = 0; i < superblock->num_inodes; i++) {
+            int byte = i / 8; // Determine the byte in the bitmap
+            int bit = i % 8;  // Determine the bit in the byte
+            int is_free = 1;  // Assume the inode is free
+
+            // Check all disks for the same inode bit
+            for (int d = 0; d < diskNum; d++) {
+                char *inode_bitmap = (char *)disks[d] + superblock->i_bitmap_ptr;
+                if (inode_bitmap[byte] & (1 << bit)) { // If allocated on any disk
+                    is_free = 0; // Mark as not free
+                    break;
+                }
+            }
+
+            if (is_free) { // If the inode is free on all disks
+                // Allocate the inode on all disks
+                for (int d = 0; d < diskNum; d++) {
+                    char *inode_bitmap = (char *)disks[d] + superblock->i_bitmap_ptr;
+                    inode_bitmap[byte] |= (1 << bit); // Mark allocated
+                }
+                return i; // Return the inode number
+            }
+        }
+    } else {
+        // Standard (non-RAID 0) Mode
+        char *inode_bitmap = disk + superblock->i_bitmap_ptr;
+        for (int i = 0; i < superblock->num_inodes; i++) {
+            if (!(inode_bitmap[i / 8] & (1 << (i % 8)))) { // Free inode
+                inode_bitmap[i / 8] |= (1 << (i % 8));    // Mark allocated
+                return i;
+            }
+        }
+    }
+
+    return -ENOSPC; // No free inodes
+}
+
 int allocate_block(char *disk) {
     printf("RAID MODE: %d\n", superblock->raid_mode);
     if (superblock->raid_mode == 0) { // RAID 0 Mode
@@ -118,128 +159,9 @@ int allocate_block(char *disk) {
     return -ENOSPC; // No free blocks
 }
 
-// Helper function to allocate and update blocks
-void allocate_and_update_blocks(struct wfs_inode *inode, size_t block_offset, int logical_block_num, int new_block, int disk_index) {
-    for (int i = 0; i < diskNum; i++) {
-        char *disk = (char *)disks[i];
-        struct wfs_inode *mirror_inode = (struct wfs_inode *)(disk + superblock->i_blocks_ptr + inode->num * BLOCK_SIZE);
 
-        if (superblock->raid_mode == 0) {
-            mirror_inode->blocks[logical_block_num] = superblock->d_blocks_ptr + new_block * BLOCK_SIZE;
-        } else {
-            mirror_inode->blocks[block_offset] = superblock->d_blocks_ptr + new_block * BLOCK_SIZE;
-        }
-    }
-}
 
-// Helper function to write to blocks
-void write_to_blocks(struct wfs_inode *inode, const char *buf, size_t bytes_written, size_t bytes_to_write, size_t block_start_offset, int disk_index, int logical_block_num) {
-    if (superblock->raid_mode == 0) {
-        char *disk = (char *)disks[disk_index];
-        void *block_ptr = disk + inode->blocks[logical_block_num] + block_start_offset;
-        memcpy(block_ptr, buf + bytes_written, bytes_to_write);
-    } else {
-        for (int i = 0; i < diskNum; i++) {
-            char *disk = (char *)disks[i];
-            void *block_ptr = disk + inode->blocks[logical_block_num] + block_start_offset;
-            memcpy(block_ptr, buf + bytes_written, bytes_to_write);
-        }
-    }
-}
 
-// Helper function to handle indirect blocks
-void handle_indirect_blocks(struct wfs_inode *inode, size_t block_offset, const char *buf, size_t size, size_t *bytes_written, size_t *block_start_offset, int disk_index) {
-    size_t indirect_offset = block_offset - D_BLOCK;
-
-    if (!inode->blocks[IND_BLOCK]) {
-        int indirect_block_index = allocate_block((char *)disks[disk_index]);
-        if (indirect_block_index < 0) return;
-
-        for (int i = 0; i < diskNum; i++) {
-            char *disk = (char *)disks[i];
-            void *indirect_block_ptr = disk + superblock->d_blocks_ptr + indirect_block_index * BLOCK_SIZE;
-            memset(indirect_block_ptr, 0, BLOCK_SIZE);
-
-            struct wfs_inode *mirror_inode = (struct wfs_inode *)(disk + superblock->i_blocks_ptr + inode->num * BLOCK_SIZE);
-            mirror_inode->blocks[IND_BLOCK] = superblock->d_blocks_ptr + indirect_block_index * BLOCK_SIZE;
-        }
-    }
-
-    uint32_t *indirect_block = (uint32_t *)((char *)disks[disk_index] + inode->blocks[IND_BLOCK]);
-    if (!indirect_block[indirect_offset]) {
-        int new_block = allocate_block((char *)disks[disk_index]);
-        if (new_block < 0) return;
-
-        for (int i = 0; i < diskNum; i++) {
-            char *disk = (char *)disks[i];
-            uint32_t *mirror_indirect_block = (uint32_t *)(disk + inode->blocks[IND_BLOCK]);
-            mirror_indirect_block[indirect_offset] = superblock->d_blocks_ptr + new_block * BLOCK_SIZE;
-        }
-    }
-
-    // Calculate data to write for the indirect block
-    size_t block_space = BLOCK_SIZE - *block_start_offset;
-    size_t bytes_to_write = (size - *bytes_written < block_space) ? size - *bytes_written : block_space;
-
-    for (int i = 0; i < diskNum; i++) {
-        char *disk = (char *)disks[i];
-        void *block_ptr = disk + indirect_block[indirect_offset] + *block_start_offset;
-        memcpy(block_ptr, buf + *bytes_written, bytes_to_write);
-    }
-
-    *bytes_written += bytes_to_write;
-    (*block_start_offset) = 0; // Reset offset for the next block
-}
-
-// Helper function to update inode metadata
-void update_inode_metadata(struct wfs_inode *inode, size_t size, off_t offset) {
-    for (int i = 0; i < diskNum; i++) {
-        char *disk = (char *)disks[i];
-        struct wfs_inode *mirror_inode = (struct wfs_inode *)(disk + superblock->i_blocks_ptr + inode->num * BLOCK_SIZE);
-        mirror_inode->size = (offset + size > mirror_inode->size) ? offset + size : mirror_inode->size;
-        mirror_inode->mtim = time(NULL);
-    }
-}
-
-int allocate_inode(char *disk) {
-    if (superblock->raid_mode == 0) { // RAID 0 Mode
-        // Iterate through all possible inodes to find a free one
-        for (int i = 0; i < superblock->num_inodes; i++) {
-            int byte = i / 8; // Determine the byte in the bitmap
-            int bit = i % 8;  // Determine the bit in the byte
-            int is_free = 1;  // Assume the inode is free
-
-            // Check all disks for the same inode bit
-            for (int d = 0; d < diskNum; d++) {
-                char *inode_bitmap = (char *)disks[d] + superblock->i_bitmap_ptr;
-                if (inode_bitmap[byte] & (1 << bit)) { // If allocated on any disk
-                    is_free = 0; // Mark as not free
-                    break;
-                }
-            }
-
-            if (is_free) { // If the inode is free on all disks
-                // Allocate the inode on all disks
-                for (int d = 0; d < diskNum; d++) {
-                    char *inode_bitmap = (char *)disks[d] + superblock->i_bitmap_ptr;
-                    inode_bitmap[byte] |= (1 << bit); // Mark allocated
-                }
-                return i; // Return the inode number
-            }
-        }
-    } else {
-        // Standard (non-RAID 0) Mode
-        char *inode_bitmap = disk + superblock->i_bitmap_ptr;
-        for (int i = 0; i < superblock->num_inodes; i++) {
-            if (!(inode_bitmap[i / 8] & (1 << (i % 8)))) { // Free inode
-                inode_bitmap[i / 8] |= (1 << (i % 8));    // Mark allocated
-                return i;
-            }
-        }
-    }
-
-    return -ENOSPC; // No free inodes
-}
 
 static int wfs_getattr(const char *path, struct stat *stbuf) {
     memset(stbuf, 0, sizeof(struct stat));
@@ -640,6 +562,90 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
 
     return bytes_written;
 }
+
+// Helper function to allocate and update blocks
+void allocate_and_update_blocks(struct wfs_inode *inode, size_t block_offset, int logical_block_num, int new_block, int disk_index) {
+    for (int i = 0; i < diskNum; i++) {
+        char *disk = (char *)disks[i];
+        struct wfs_inode *mirror_inode = (struct wfs_inode *)(disk + superblock->i_blocks_ptr + inode->num * BLOCK_SIZE);
+
+        if (superblock->raid_mode == 0) {
+            mirror_inode->blocks[logical_block_num] = superblock->d_blocks_ptr + new_block * BLOCK_SIZE;
+        } else {
+            mirror_inode->blocks[block_offset] = superblock->d_blocks_ptr + new_block * BLOCK_SIZE;
+        }
+    }
+}
+
+// Helper function to write to blocks
+void write_to_blocks(struct wfs_inode *inode, const char *buf, size_t bytes_written, size_t bytes_to_write, size_t block_start_offset, int disk_index, int logical_block_num) {
+    if (superblock->raid_mode == 0) {
+        char *disk = (char *)disks[disk_index];
+        void *block_ptr = disk + inode->blocks[logical_block_num] + block_start_offset;
+        memcpy(block_ptr, buf + bytes_written, bytes_to_write);
+    } else {
+        for (int i = 0; i < diskNum; i++) {
+            char *disk = (char *)disks[i];
+            void *block_ptr = disk + inode->blocks[logical_block_num] + block_start_offset;
+            memcpy(block_ptr, buf + bytes_written, bytes_to_write);
+        }
+    }
+}
+
+// Helper function to handle indirect blocks
+void handle_indirect_blocks(struct wfs_inode *inode, size_t block_offset, const char *buf, size_t size, size_t *bytes_written, size_t *block_start_offset, int disk_index) {
+    size_t indirect_offset = block_offset - D_BLOCK;
+
+    if (!inode->blocks[IND_BLOCK]) {
+        int indirect_block_index = allocate_block((char *)disks[disk_index]);
+        if (indirect_block_index < 0) return -ENOSPC;
+
+        for (int i = 0; i < diskNum; i++) {
+            char *disk = (char *)disks[i];
+            void *indirect_block_ptr = disk + superblock->d_blocks_ptr + indirect_block_index * BLOCK_SIZE;
+            memset(indirect_block_ptr, 0, BLOCK_SIZE);
+
+            struct wfs_inode *mirror_inode = (struct wfs_inode *)(disk + superblock->i_blocks_ptr + inode->num * BLOCK_SIZE);
+            mirror_inode->blocks[IND_BLOCK] = superblock->d_blocks_ptr + indirect_block_index * BLOCK_SIZE;
+        }
+    }
+
+    uint32_t *indirect_block = (uint32_t *)((char *)disks[disk_index] + inode->blocks[IND_BLOCK]);
+    if (!indirect_block[indirect_offset]) {
+        int new_block = allocate_block((char *)disks[disk_index]);
+        if (new_block < 0) return -ENOSPC;
+
+        for (int i = 0; i < diskNum; i++) {
+            char *disk = (char *)disks[i];
+            uint32_t *mirror_indirect_block = (uint32_t *)(disk + inode->blocks[IND_BLOCK]);
+            mirror_indirect_block[indirect_offset] = superblock->d_blocks_ptr + new_block * BLOCK_SIZE;
+        }
+    }
+
+    // Calculate data to write for the indirect block
+    size_t block_space = BLOCK_SIZE - *block_start_offset;
+    size_t bytes_to_write = (size - *bytes_written < block_space) ? size - *bytes_written : block_space;
+
+    for (int i = 0; i < diskNum; i++) {
+        char *disk = (char *)disks[i];
+        void *block_ptr = disk + indirect_block[indirect_offset] + *block_start_offset;
+        memcpy(block_ptr, buf + *bytes_written, bytes_to_write);
+    }
+
+    *bytes_written += bytes_to_write;
+    (*block_start_offset) = 0; // Reset offset for the next block
+}
+
+// Helper function to update inode metadata
+void update_inode_metadata(struct wfs_inode *inode, size_t size, off_t offset) {
+    for (int i = 0; i < diskNum; i++) {
+        char *disk = (char *)disks[i];
+        struct wfs_inode *mirror_inode = (struct wfs_inode *)(disk + superblock->i_blocks_ptr + inode->num * BLOCK_SIZE);
+        mirror_inode->size = (offset + size > mirror_inode->size) ? offset + size : mirror_inode->size;
+        mirror_inode->mtim = time(NULL);
+    }
+}
+
 
 static int wfs_unlink(const char *path) {
     printf("unlink called for path: %s\n", path);
