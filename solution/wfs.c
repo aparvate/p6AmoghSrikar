@@ -542,8 +542,6 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
     while (bytes < size) {
         int disk_index = (superblock->raid_mode == 0) ? bOff % diskNum : 0;
         int logical_block_num = (superblock->raid_mode == 0) ? bOff / diskNum : bOff;
-
-        // Handle direct blocks
         if (bOff < D_BLOCK) {
             if (inode->blocks[bOff] == 0) {
                 if (allocate_and_map_direct_block(inode, bOff, disk_index, logical_block_num) < 0) {
@@ -558,7 +556,6 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
 
             write_to_block(buf, bytes, bytesWrite, bStart, inode->blocks[logical_block_num], disk_index);
         }
-        // Handle indirect blocks
         else {
             size_t indirect_offset = bOff - D_BLOCK;
             if (inode->blocks[IND_BLOCK] == 0) {
@@ -598,6 +595,14 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
 
 static int wfs_unlink(const char *path) {
     printf("unlink called for path: %s\n", path);
+    // int returnValue = 0;
+    // for (int i = 0; i < D_BLOCK; i++) {
+    //     if (parent_inode->blocks[i] == 0) {
+    //         int blockIndex = allocate_block(disk);
+    //         if (blockIndex < 0) 
+    //             return -ENOSPC;
+    //         parent_inode->blocks[i] = superblock->d_blocks_ptr + blockIndex * BLOCK_SIZE;
+    //     }
     //TODO
     return SUCCEED; // SUCCEED
 }
@@ -605,6 +610,17 @@ static int wfs_unlink(const char *path) {
 static int wfs_rmdir(const char *path) {
     printf("rmdir called for path: %s\n", path);
     //TODO
+    // printf("rmdir\n");
+
+    // char parent_path[1024], new_name[MAX_NAME];
+    // parse_path(path, parent_path, new_name, sizeof(parent_path));
+
+    // // Fetch the node
+    // struct wfs_inode *parent_inode = get_inode(parent_path, disk);
+    // if (!parent_inode) {
+    //     //printf("Dir does not exist");
+    //     return -ENOENT;
+    // }
     return SUCCEED; // SUCCEED
 }
 
