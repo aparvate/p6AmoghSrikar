@@ -25,40 +25,42 @@ size_t diskSize;
 static int *fileDescs;
 
 struct wfs_inode *get_inode(const char *path, char* disk) {
-    printf("Entering get INODE, path is %s\n", path);
+    // Start at the root inode
+    char *inode_table = disk + sb->i_blocks_ptr;
+    struct wfs_inode *inode = (struct wfs_inode *)(inode_table);
+
     if (strcmp(path, "/") == 0) {
-        printf("Path is root\n");
-        return 0;
+        return inode;  // Root directory
     }
-    char *inode_table = disk + superblock->i_blocks_ptr;
-    struct wfs_inode *currInode = (struct wfs_inode *)(inode_table);
 
     // Parse the path
-    char temp_path[264];
-    strncpy(temp_path, path, 263);
+    char temp_path[1024];
+    strncpy(temp_path, path, sizeof(temp_path));
     char *token = strtok(temp_path, "/");
-    while (token != NULL) {
-        bool found = false;
+    while (token) {
+        int found = 0;
         for (int i = 0; i < D_BLOCK; i++) {
-            off_t blockStart = currInode->blocks[i];
-            if (blockStart == 0) {break;}
-            struct wfs_dentry *dentry = (struct wfs_dentry *)((char *)disks[0] + blockStart);
+            if (inode->blocks[i] == 0) break; // No more blocks
+
+            struct wfs_dentry *dir_entries = (struct wfs_dentry *)((char *)disk_maps[0] + inode->blocks[i]);
             for (int j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
-                if (strcmp(dentry[j].name, token) == 0) {
-                    currInode = (struct wfs_inode *)(inode_table + (dentry[j].num * BLOCK_SIZE));
-                    found = true;
+                if (strcmp(dir_entries[j].name, token) == 0) {
+		   
+
+                    inode = (struct wfs_inode *)(inode_table + (dir_entries[j].num * BLOCK_SIZE));
+                    found = 1;
                     break;
                 }
             }
             if (found) break;
         }
+
         if (!found) {
-            printf("Did not find\n");
             return NULL;  // Path does not exist
         }
         token = strtok(NULL, "/");
     }
-    return currInode;
+    return inode;
 }
 
 void check_inode() {
