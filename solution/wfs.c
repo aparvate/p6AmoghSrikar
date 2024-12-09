@@ -298,13 +298,14 @@ static int wfs_mkdir(const char *path, mode_t mode) {
 }
 
 
-// Helper to parse path into parent directory path and new file name
+// Helper to parse the parent path and new file name
 static void parse_path(const char *path, char *parent_path, char *new_name) {
     strncpy(parent_path, path, sizeof(parent_path) - 1);
     parent_path[sizeof(parent_path) - 1] = '\0';
     char *slash = strrchr(parent_path, '/');
+
     if (!slash || slash == parent_path) {
-        strncpy(new_name, path + 1, MAX_NAME - 1); // Root directory
+        strncpy(new_name, path + 1, MAX_NAME - 1); // Handle root directory
         new_name[MAX_NAME - 1] = '\0';
         strcpy(parent_path, "/");
     } else {
@@ -314,20 +315,20 @@ static void parse_path(const char *path, char *parent_path, char *new_name) {
     }
 }
 
-// Initialize a new inode for a file
+// Helper to initialize a new file inode
 static void initialize_file_inode(struct wfs_inode *inode, int inode_index, mode_t mode) {
     memset(inode, 0, BLOCK_SIZE);
     inode->num = inode_index;
-    inode->mode = S_IFREG | mode; // Set file mode
-    inode->nlinks = 1;           // Single link for a file
-    inode->size = 0;             // Empty file initially
+    inode->mode = S_IFREG | mode; // Regular file mode
+    inode->nlinks = 1;           // Single link
+    inode->size = 0;             // Initially empty
     inode->atim = inode->mtim = inode->ctim = time(NULL);
     inode->uid = getuid();
     inode->gid = getgid();
 }
 
-// Mirror inode creation across RAID 0 disks
-static void mirror_inode_raid0(int inode_index, mode_t mode) {
+// Mirror inode initialization across disks in RAID 0
+static void mirror_file_inode_raid0(int inode_index, mode_t mode) {
     for (int i = 0; i < diskNum; i++) {
         char *inode_table = (char *)disks[i] + superblock->i_blocks_ptr;
         struct wfs_inode *inode = (struct wfs_inode *)(inode_table + inode_index * BLOCK_SIZE);
@@ -335,8 +336,8 @@ static void mirror_inode_raid0(int inode_index, mode_t mode) {
     }
 }
 
-// Add a directory entry in the parent directory
-static int add_file_to_parent(struct wfs_inode *parent_inode, const char *parent_path, const char *new_name, int new_inode_index, char *disk) {
+// Add a file entry to the parent directory
+static int add_file_entry(struct wfs_inode *parent_inode, const char *parent_path, const char *new_name, int new_inode_index, char *disk) {
     int found_space = 0;
 
     for (int i = 0; i < D_BLOCK; i++) {
@@ -346,14 +347,13 @@ static int add_file_to_parent(struct wfs_inode *parent_inode, const char *parent
             if (block_index < 0) {
                 return -ENOSPC; // No free blocks
             }
-
             parent_inode->blocks[i] = superblock->d_blocks_ptr + block_index * BLOCK_SIZE;
         }
 
-        // Get directory entries in the block
+        // Find space in the current directory block
         struct wfs_dentry *dir_entries = get_dentry((void *)disk, parent_inode->blocks[i]);
         for (int j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
-            if (dir_entries[j].num == 0) { // Found empty entry
+            if (dir_entries[j].num == 0) { // Empty entry
                 strncpy(dir_entries[j].name, new_name, MAX_NAME - 1);
                 dir_entries[j].name[MAX_NAME - 1] = '\0';
                 dir_entries[j].num = new_inode_index;
@@ -368,15 +368,15 @@ static int add_file_to_parent(struct wfs_inode *parent_inode, const char *parent
         }
     }
 
-    return found_space ? SUCCEED : -ENOSPC; // Parent directory full if no space found
+    return found_space ? SUCCEED : -ENOSPC; // Return success or error if no space found
 }
 
-// Helper function to create a file node
+// Helper function for wfs_mknod
 static int wfs_mknod_helper(const char *path, mode_t mode, char *disk) {
     char parent_path[1024], new_name[MAX_NAME];
     parse_path(path, parent_path, new_name);
 
-    // Get the parent inode
+    // Fetch the parent inode
     struct wfs_inode *parent_inode = get_inode(parent_path, disk);
     if (!parent_inode) {
         return -ENOENT; // Parent directory not found
@@ -390,7 +390,7 @@ static int wfs_mknod_helper(const char *path, mode_t mode, char *disk) {
 
     // Initialize or mirror inode based on RAID mode
     if (superblock->raid_mode == 0) {
-        mirror_inode_raid0(new_inode_index, mode);
+        mirror_file_inode_raid0(new_inode_index, mode);
     } else {
         char *inode_table = disk + superblock->i_blocks_ptr;
         struct wfs_inode *new_inode = (struct wfs_inode *)(inode_table + new_inode_index * BLOCK_SIZE);
@@ -398,13 +398,13 @@ static int wfs_mknod_helper(const char *path, mode_t mode, char *disk) {
     }
 
     // Add file entry to the parent directory
-    int result = add_file_to_parent(parent_inode, parent_path, new_name, new_inode_index, disk);
+    int result = add_file_entry(parent_inode, parent_path, new_name, new_inode_index, disk);
     return result;
 }
 
 // FUSE mknod implementation
 static int wfs_mknod(const char *path, mode_t mode, dev_t rdev) {
-    int result = SUCCEED;
+    int result = 0;
 
     if (superblock->raid_mode == 0) {
         result = wfs_mknod_helper(path, mode, (char *)disks[0]);
