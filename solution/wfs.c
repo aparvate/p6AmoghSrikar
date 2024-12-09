@@ -201,9 +201,9 @@ static void mirror_inode_raid0(int inode_index, mode_t mode) {
 }
 
 static void mirror_inode_raidnormal(int inode_index, mode_t mode) {
-    char *inode_table = (char *)disks[i] + superblock->i_blocks_ptr;
-    struct wfs_inode *new_inode = (struct wfs_inode *)(inode_table + new_inode_index * BLOCK_SIZE);
-    initialize_new_inode(new_inode, new_inode_index, mode);
+    char *inode_table = (char *)disks[0] + superblock->i_blocks_ptr;
+    struct wfs_inode *inode = (struct wfs_inode *)(inode_table + inode_index * BLOCK_SIZE);
+    initialize_new_inode(inode, inode_index, mode);
 }
 
 // Add a new directory entry to the parent directory
