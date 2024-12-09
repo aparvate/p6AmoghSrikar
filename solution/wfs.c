@@ -533,65 +533,66 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
         return -EISDIR; // Not a directory
     }
 
-    size_t bytes_written = 0;
-    size_t block_offset = offset / BLOCK_SIZE;
-    size_t block_start_offset = offset % BLOCK_SIZE;
-    size_t block_available_space;
-    size_t bytes_to_write;
+    size_t bytes = 0;
+    size_t bOff = offset / BLOCK_SIZE;
+    size_t bStart = offset % BLOCK_SIZE;
+    size_t bSpace;
+    size_t bytesWrite;
 
-    while (bytes_written < size) {
-        int disk_index = (superblock->raid_mode == 0) ? block_offset % diskNum : 0;
-        int logical_block_num = (superblock->raid_mode == 0) ? block_offset / diskNum : block_offset;
+    while (bytes < size) {
+        int disk_index = (superblock->raid_mode == 0) ? bOff % diskNum : 0;
+        int logical_block_num = (superblock->raid_mode == 0) ? bOff / diskNum : bOff;
 
         // Handle direct blocks
-        if (block_offset < D_BLOCK) {
-            if (inode->blocks[block_offset] == 0) {
-                if (allocate_and_map_direct_block(inode, block_offset, disk_index, logical_block_num) < 0) {
+        if (bOff < D_BLOCK) {
+            if (inode->blocks[bOff] == 0) {
+                if (allocate_and_map_direct_block(inode, bOff, disk_index, logical_block_num) < 0) {
                     return -ENOSPC;
                 }
             }
+            bSpace = BLOCK_SIZE - bStart;
+            if (size - bytes < bSpace)
+                bytesWrite = size - bytes
+            else
+                bytesWrite = bSpace
 
-            block_available_space = BLOCK_SIZE - block_start_offset;
-            bytes_to_write = (size - bytes_written < block_available_space) ? size - bytes_written : block_available_space;
-
-            write_to_block(buf, bytes_written, bytes_to_write, block_start_offset, inode->blocks[logical_block_num], disk_index);
+            write_to_block(buf, bytes, bytesWrite, bStart, inode->blocks[logical_block_num], disk_index);
         }
         // Handle indirect blocks
         else {
-            size_t indirect_offset = block_offset - D_BLOCK;
-
+            size_t indirect_offset = bOff - D_BLOCK;
             if (inode->blocks[IND_BLOCK] == 0) {
                 if (allocate_and_map_indirect_block(inode, disk_index) < 0) {
                     return -ENOSPC;
                 }
             }
-
             uint32_t *indirect_block = (uint32_t *)((char *)disks[disk_index] + inode->blocks[IND_BLOCK]);
             if (indirect_block[indirect_offset] == 0) {
                 if (allocate_and_map_direct_block(inode, indirect_offset, disk_index, logical_block_num) < 0) {
                     return -ENOSPC;
                 }
             }
+            bSpace = BLOCK_SIZE - bStart;
+            if (size - bytes < bSpace)
+                bytesWrite = size - bytes
+            else
+                bytesWrite = bSpace
 
-            block_available_space = BLOCK_SIZE - block_start_offset;
-            bytes_to_write = (size - bytes_written < block_available_space) ? size - bytes_written : block_available_space;
-
-            write_to_block(buf, bytes_written, bytes_to_write, block_start_offset, indirect_block[indirect_offset], disk_index);
+            write_to_block(buf, bytes, bytesWrite, bStart, indirect_block[indirect_offset], disk_index);
         }
-
-        bytes_written += bytes_to_write;
-        block_offset++;
-        block_start_offset = 0; // Reset for subsequent blocks
+        bytes += bytesWrite;
+        bOff++;
+        bStart = 0; // Reset for subsequent blocks
     }
 
     // Update inode metadata on all disks
     for (int i = 0; i < diskNum; i++) {
         struct wfs_inode *mirror_inode = (struct wfs_inode *)((char *)disks[i] + superblock->i_blocks_ptr + inode->num * BLOCK_SIZE);
         mirror_inode->size = (offset + size > mirror_inode->size) ? offset + size : mirror_inode->size;
-        mirror_inode->mtim = time(NULL);
+        //mirror_inode->mtim = time(NULL);
     }
 
-    return bytes_written;
+    return bytes;
 }
 
 
