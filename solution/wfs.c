@@ -276,7 +276,7 @@ static int wfs_mkdir_helper(const char *path, mode_t mode, char *disk) {
     if (superblock->raid_mode == 0) {
         mirror_inode_raid0(new_inode_index, mode);
     } else {
-        // mirror_inode_raidnormal(new_inode_index, mode);
+        mirror_inode_raidnormal(new_inode_index, mode);
         // char *inode_table = disk + superblock->i_blocks_ptr;
         // struct wfs_inode *new_inode = (struct wfs_inode *)(inode_table + new_inode_index * BLOCK_SIZE);
         initialize_new_inode(new_inode, new_inode_index, mode);
