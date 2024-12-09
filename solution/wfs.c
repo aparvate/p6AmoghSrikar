@@ -153,7 +153,7 @@ void handle_indirect_blocks(struct wfs_inode *inode, size_t block_offset, const 
 
     if (!inode->blocks[IND_BLOCK]) {
         int indirect_block_index = allocate_block((char *)disks[disk_index]);
-        if (indirect_block_index < 0) return -ENOSPC;
+        if (indirect_block_index < 0) return;
 
         for (int i = 0; i < diskNum; i++) {
             char *disk = (char *)disks[i];
@@ -168,7 +168,7 @@ void handle_indirect_blocks(struct wfs_inode *inode, size_t block_offset, const 
     uint32_t *indirect_block = (uint32_t *)((char *)disks[disk_index] + inode->blocks[IND_BLOCK]);
     if (!indirect_block[indirect_offset]) {
         int new_block = allocate_block((char *)disks[disk_index]);
-        if (new_block < 0) return -ENOSPC;
+        if (new_block < 0) return;
 
         for (int i = 0; i < diskNum; i++) {
             char *disk = (char *)disks[i];
