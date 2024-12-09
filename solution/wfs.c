@@ -415,27 +415,20 @@ static int wfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_
     return SUCCEED;
 }
 
-// Helper to fetch a data block for reading
 static void *get_data_block(struct wfs_inode *inode, size_t block_offset) {
     if (block_offset < D_BLOCK) {
-        if (inode->blocks[block_offset] == 0) {
-            return NULL; // No more data
-        }
-        return (char *)disks[0] + inode->blocks[block_offset];
+        if (inode->blocks[block_offset] == 0)
+            return NULL;
+        else
+            return (char *)disks[0] + inode->blocks[block_offset];
     }
-
-    // Handle indirect blocks
-    size_t indirect_offset = block_offset - D_BLOCK;
-    if (inode->blocks[IND_BLOCK] == 0) {
-        return NULL; // No indirect blocks
-    }
-
+    if (inode->blocks[IND_BLOCK] == 0)
+        return NULL;
     uint32_t *indirect_block = (uint32_t *)((char *)disks[0] + inode->blocks[IND_BLOCK]);
-    if (indirect_block[indirect_offset] == 0) {
-        return NULL; // No more data
-    }
+    if (indirect_block[block_offset - D_BLOCK] == 0)
+        return NULL;
 
-    return (char *)disks[0] + indirect_block[indirect_offset];
+    return (char *)disks[0] + indirect_block[block_offset - D_BLOCK];
 }
 
 // Main file read implementation
@@ -446,8 +439,12 @@ static int wfs_read(const char *path, char *buf, size_t size, off_t offset, stru
         return -ENOENT; // File not found
     }
 
-    if (!S_ISREG(inode->mode)) {
-        return -EISDIR; // Cannot read a directory
+    // if (!S_ISREG(inode->mode)) {
+    //     return -EISDIR; // Cannot read a directory
+    // }
+    if ((inode->mode & S_IFDIR)) {
+        printf("Cannot read\n");
+        return -EISDIR; // Not a directory
     }
 
     size_t bytes_read = 0;              // Total bytes read
@@ -559,8 +556,12 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
         return -ENOENT; // File not found
     }
 
-    if (!S_ISREG(inode->mode)) {
-        return -EISDIR; // Cannot write to a directory
+    // if (!S_ISREG(inode->mode)) {
+    //     return -EISDIR; // Cannot write to a directory
+    // }
+    if ((inode->mode & S_IFDIR)) {
+        printf("Cannot read\n");
+        return -EISDIR; // Not a directory
     }
 
     size_t bytes_written = 0;
