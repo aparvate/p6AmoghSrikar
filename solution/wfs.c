@@ -10,57 +10,54 @@
 #include <time.h>
 #include "wfs.h"
 
-
-// Constants
-#define ROOT_INODE 0
 #define SUCCEED 0
 #define ERROR -1
 
-// Global variables
-void *disks[10];  // Memory-mapped disk images
-struct wfs_sb *superblock;    // Superblock pointer
+void *disks[10];  // Disk images
+struct wfs_sb *superblock;
 int diskNum;
 size_t diskSize;
 static int *fileDescs;
 
-// Helper: Find inode by path
-struct wfs_inode *get_inode_by_path(const char *path, char* disk) {
-    // Start at the root inode
-    char *inode_table = disk + superblock->i_blocks_ptr;
-    struct wfs_inode *inode = (struct wfs_inode *)(inode_table);
-
+struct wfs_inode *get_inode(const char *path, char* disk) {
+    printf("Entering get INODE, path is %s\n", path);
     if (strcmp(path, "/") == 0) {
-        return inode;  // Root directory
+        printf("Path is root\n");
+        return 0;
     }
+    char *inode_table = disk + superblock->i_blocks_ptr;
+    struct wfs_inode *currInode = (struct wfs_inode *)(inode_table);
 
     // Parse the path
-    char temp_path[1024];
-    strncpy(temp_path, path, sizeof(temp_path));
+    char temp_path[264];
+    strncpy(temp_path, path, 263);
     char *token = strtok(temp_path, "/");
-    while (token) {
-        int found = 0;
+    while (token != NULL) {
+        bool found = false;
         for (int i = 0; i < D_BLOCK; i++) {
-            if (inode->blocks[i] == 0) break; // No more blocks
-
-            struct wfs_dentry *dir_entries = (struct wfs_dentry *)((char *)disks[0] + inode->blocks[i]);
-            for (int j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
-                if (strcmp(dir_entries[j].name, token) == 0) {
-		   
-
-                    inode = (struct wfs_inode *)(inode_table + (dir_entries[j].num * BLOCK_SIZE));
-                    found = 1;
-                    break;
+            off_t blockStart = currInode->blocks[i];
+            if (blockStart == 0) {
+                break;
+            } // No more blocks
+            else{
+                struct wfs_dentry *dentry = (struct wfs_dentry *)((char *)disks[0] + blockStart);
+                for (int j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
+                    if (strcmp(dentry[j]->name, token) == 0) {
+                        currInode = dentry[j]->num;
+                        found = true;
+                        break;
+                    }
                 }
             }
             if (found) break;
         }
-
         if (!found) {
+            printf("Did not find\n");
             return NULL;  // Path does not exist
         }
         token = strtok(NULL, "/");
     }
-    return inode;
+    return currInode;
 }
 
 void check_inode() {
@@ -187,7 +184,7 @@ int allocate_block(char *disk) {
 static int wfs_getattr(const char *path, struct stat *stbuf) {
     memset(stbuf, 0, sizeof(struct stat));
 
-    struct wfs_inode *inode = get_inode_by_path(path, (char *)disks[0]);
+    struct wfs_inode *inode = get_inode(path, (char *)disks[0]);
     if (!inode) {
         return -ENOENT;  // File or directory not found
     }
@@ -220,7 +217,7 @@ static int wfs_mkdir_helper(const char *path, mode_t mode, char *disk) {
         *slash = '\0';
     }
 
-    struct wfs_inode *parent_inode = get_inode_by_path(parent_path, disk);
+    struct wfs_inode *parent_inode = get_inode(parent_path, disk);
     printf("parent path: %s", parent_path);
     if (!parent_inode) {
         return -ENOENT;  // Parent directory does not exist
@@ -283,7 +280,7 @@ static int wfs_mkdir_helper(const char *path, mode_t mode, char *disk) {
 		for(int d = 0; d < diskNum; d++) {
 		    //int disk_index = block_index % num_disks;
 		    int logical_block_num = block_index / diskNum; 
-	    	    struct wfs_inode *sync_inode = get_inode_by_path(parent_path, (char *)disks[d]);
+	    	    struct wfs_inode *sync_inode = get_inode(parent_path, (char *)disks[d]);
 		    sync_inode->blocks[i] = superblock->d_blocks_ptr + logical_block_num * BLOCK_SIZE;
 
 		}
@@ -345,7 +342,7 @@ static int wfs_mknod_helper(const char *path, mode_t mode, char *disk) {
         *slash = '\0';
     }
 
-    struct wfs_inode *parent_inode = get_inode_by_path(parent_path, disk);
+    struct wfs_inode *parent_inode = get_inode(parent_path, disk);
     if (!parent_inode) {
         return -ENOENT;  // Parent directory not found
     }
@@ -446,7 +443,7 @@ static int wfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_
     printf("readdir called for path: %s\n", path);
 
     // Find the inode for the directory
-    struct wfs_inode *inode = get_inode_by_path(path, (char *)disks[0]);
+    struct wfs_inode *inode = get_inode(path, (char *)disks[0]);
     if (!inode) {
         return -ENOENT; // Directory not found
     }
@@ -479,7 +476,7 @@ static int wfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_
 
 static int wfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
     // Find the inode for the file
-    struct wfs_inode *inode = get_inode_by_path(path, (char *)disks[0]);
+    struct wfs_inode *inode = get_inode(path, (char *)disks[0]);
     if (!inode) {
         return -ENOENT; // File not found
     }
@@ -533,7 +530,7 @@ static int wfs_read(const char *path, char *buf, size_t size, off_t offset, stru
 }
 
 static int wfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
-    struct wfs_inode *inode = get_inode_by_path(path, (char *)disks[0]);
+    struct wfs_inode *inode = get_inode(path, (char *)disks[0]);
     if (!inode) {
         return -ENOENT; // File not found
     }
@@ -729,7 +726,7 @@ static int wfs_unlink(const char *path) {
     }
 
     // Step 2: Get the parent directory's inode
-    struct wfs_inode *parent_inode = get_inode_by_path(parent_path, (char *)disks[0]);
+    struct wfs_inode *parent_inode = get_inode(parent_path, (char *)disks[0]);
     if (!parent_inode || !S_ISDIR(parent_inode->mode)) {
         return -ENOENT; // Parent directory not found
     }
@@ -827,7 +824,7 @@ static int wfs_rmdir(const char *path) {
     }
 
     // Step 2: Get the parent directory's inode
-    struct wfs_inode *parent_inode = get_inode_by_path(parent_path, (char *)disks[0]);
+    struct wfs_inode *parent_inode = get_inode(parent_path, (char *)disks[0]);
     if (!parent_inode || !S_ISDIR(parent_inode->mode)) {
         return -ENOENT; // Parent directory not found
     }
