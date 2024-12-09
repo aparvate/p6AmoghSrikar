@@ -388,25 +388,6 @@ static int wfs_mknod(const char *path, mode_t mode, dev_t rdev) {
     return result;
 }
 
-
-// Helper to validate and retrieve the inode for a directory
-static struct wfs_inode *validate_directory_inode(const char *path, char *disk) {
-    printf("Validating directory inode for path: %s\n", path);
-
-    struct wfs_inode *inode = get_inode(path, disk);
-    if (!inode) {
-        printf("Directory not found for path: %s\n", path);
-        return NULL;
-    }
-
-    if (!(inode->mode & S_IFDIR)) {
-        printf("Path is not a directory: %s\n", path);
-        return NULL;
-    }
-
-    return inode;
-}
-
 // Helper to read entries from a block and fill them into the buffer
 static void fill_directory_entries(void *buf, fuse_fill_dir_t filler, char *disk, uint32_t block) {
     struct wfs_dentry *dir_entries = get_dentry(disk, block);
@@ -424,9 +405,13 @@ static int wfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_
     printf("readdir called for path: %s\n", path);
 
     // Validate and retrieve the inode
-    struct wfs_inode *inode = validate_directory_inode(path, (char *)disks[0]);
+    struct wfs_inode *inode = get_inode(path, disk);
     if (!inode) {
         return -ENOENT; // Directory not found or invalid
+    }
+    if (!(inode->mode & S_IFDIR)) {
+        printf("Path is not a directory: %s\n", path);
+        return NULL;
     }
 
     // Fill standard entries for "." and ".."
