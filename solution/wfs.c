@@ -297,24 +297,6 @@ static int wfs_mkdir(const char *path, mode_t mode) {
     return SUCCEED;
 }
 
-
-// Helper to parse the parent path and new file name
-static void parse_path(const char *path, char *parent_path, char *new_name) {
-    strncpy(parent_path, path, sizeof(parent_path) - 1);
-    parent_path[sizeof(parent_path) - 1] = '\0';
-    char *slash = strrchr(parent_path, '/');
-
-    if (!slash || slash == parent_path) {
-        strncpy(new_name, path + 1, MAX_NAME - 1); // Handle root directory
-        new_name[MAX_NAME - 1] = '\0';
-        strcpy(parent_path, "/");
-    } else {
-        strncpy(new_name, slash + 1, MAX_NAME - 1);
-        new_name[MAX_NAME - 1] = '\0';
-        *slash = '\0';
-    }
-}
-
 // Helper to initialize a new file inode
 static void initialize_file_inode(struct wfs_inode *inode, int inode_index, mode_t mode) {
     memset(inode, 0, BLOCK_SIZE);
