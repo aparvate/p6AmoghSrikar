@@ -557,7 +557,7 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
         mirror_inode->mtim = time(NULL);
     }
 
-    return bytes_written;
+    return bytesWrite;
 }
 
 
