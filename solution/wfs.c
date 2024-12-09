@@ -197,26 +197,28 @@ static void initialize_new_inode(struct wfs_inode *inode, int inode_index, mode_
     inode->gid = getgid();
 }
 
-// Helper to initialize a new file inode
-// static void initialize_file_inode(struct wfs_inode *inode, int inode_index, mode_t mode) {
-//     memset(inode, 0, BLOCK_SIZE);
-//     inode->num = inode_index;
-//     inode->mode = S_IFREG | mode; // Regular file mode
-//     inode->nlinks = 1;           // Single link
-//     inode->size = 0;             // Initially empty
-//     inode->atim = inode->mtim = inode->ctim = time(NULL);
-//     inode->uid = getuid();
-//     inode->gid = getgid();
-// }
-
 // Allocate and mirror the new inode across disks in RAID 0
-static void mirror_inode_raid0(int inode_index, mode_t mode) {
+static void mirror_inode_raid0(int inode_index, mode_t mode, bool nod) {
     for (int i = 0; i < diskNum; i++) {
         char *inode_table = (char *)disks[i] + superblock->i_blocks_ptr;
         struct wfs_inode *inode = (struct wfs_inode *)(inode_table + inode_index * BLOCK_SIZE);
-        initialize_new_inode(inode, inode_index, mode, false);
+        if (nod){
+            initialize_new_inode(inode, inode_index, mode, true);
+        }
+        else{
+            initialize_new_inode(inode, inode_index, mode, false);
+        }
     }
 }
+
+// // Mirror inode initialization across disks in RAID 0
+// static void mirror_file_inode_raid0(int inode_index, mode_t mode) {
+//     for (int i = 0; i < diskNum; i++) {
+//         char *inode_table = (char *)disks[i] + superblock->i_blocks_ptr;
+//         struct wfs_inode *inode = (struct wfs_inode *)(inode_table + inode_index * BLOCK_SIZE);
+//         initialize_new_inode(inode, inode_index, mode, true);
+//     }
+// }
 
 static int add_directory_entry(struct wfs_inode *parent_inode, const char *parent_path, const char *new, int newIndex, char *disk) {
     int returnValue = 0;
@@ -278,7 +280,7 @@ static int wfs_mkdir_helper(const char *path, mode_t mode, char *disk) {
     printf("Node %d\n", new_inode_index);
     if (superblock->raid_mode == 0) {
         //printf("Raid Mode 0");
-        mirror_inode_raid0(new_inode_index, mode);
+        mirror_inode_raid0(new_inode_index, mode, false);
     } else {
         //printf("Raid Mode 1");
         char *inode_table = disk + superblock->i_blocks_ptr;
@@ -302,15 +304,6 @@ static int wfs_mkdir(const char *path, mode_t mode) {
         }
     }
     return SUCCEED;
-}
-
-// Mirror inode initialization across disks in RAID 0
-static void mirror_file_inode_raid0(int inode_index, mode_t mode) {
-    for (int i = 0; i < diskNum; i++) {
-        char *inode_table = (char *)disks[i] + superblock->i_blocks_ptr;
-        struct wfs_inode *inode = (struct wfs_inode *)(inode_table + inode_index * BLOCK_SIZE);
-        initialize_new_inode(inode, inode_index, mode, true);
-    }
 }
 
 // Add a file entry to the parent directory
@@ -367,7 +360,7 @@ static int wfs_mknod_helper(const char *path, mode_t mode, char *disk) {
 
     // Initialize or mirror inode based on RAID mode
     if (superblock->raid_mode == 0) {
-        mirror_file_inode_raid0(new_inode_index, mode);
+        mirror_file_inode_raid0(new_inode_index, mode, true);
     } else {
         char *inode_table = disk + superblock->i_blocks_ptr;
         struct wfs_inode *new_inode = (struct wfs_inode *)(inode_table + new_inode_index * BLOCK_SIZE);
