@@ -81,7 +81,7 @@ int allocate_inode(char *disk) {
             for (int d = 0; d < diskNum; d++) {
                 char *inode_bitmap = get_bit_inode(disks[d], superblock->i_bitmap_ptr);
                 //((char *)disks[d] + superblock->i_bitmap_ptr);
-                if (((char *)disks[d] + superblock->i_bitmap_ptr)[i / 8] & (1 << (i % 8))) { // If allocated on any disk
+                if (inode_bitmap[i / 8] & (1 << (i % 8))) { // If allocated on any disk
                     is_free = 0; // Mark as not free
                     break;
                 }
