@@ -141,7 +141,6 @@ int allocate_block(char *disk) {
     } else {
         // RAID 1 or no RAID: Allocate using standard logic
         char *data_bitmap = get_bitmap((void*)disk, superblock->d_bitmap_ptr);
-        //disk + superblock->d_bitmap_ptr;
         for (int i = 0; i < superblock->num_data_blocks; i++) {
             if (!(data_bitmap[i / 8] & (1 << (i % 8)))) { // Free block
                 data_bitmap[i / 8] |= (1 << (i % 8));     // Mark allocated
@@ -153,9 +152,39 @@ int allocate_block(char *disk) {
 
     return -ENOSPC; // No free blocks
 }
+int allocate_block(char *disk) {
+    printf("RAID MODE: %d\n", superblock->raid_mode);
+    // RAID 0
+    if (superblock->raid_mode == 0) {
+        for (int i = 0; i < superblock->num_data_blocks; i++) {
+            uint8_t *currBitmap = (uint8_t *)disks[i % diskNum] + superblock->d_bitmap_ptr;
 
+            if (!(currBitmap[((i / diskNum) / 8)] & (1 << ((i / diskNum) % 8)))) {
+                currBitmap[((i / diskNum) / 8)] |= (1 << ((i / diskNum) % 8));
 
+                // Zeroing out the newly allocated block
+                char *blockPointer = (char *)disks[i % diskNum] + superblock->d_blocks_ptr + ((i / diskNum) * BLOCK_SIZE);
+                char newBlock[BLOCK_SIZE];
+                memset(newBlock, 0, BLOCK_SIZE);
+                if (newBlock[0] != 0){
+                    return ERROR;
+                }
+                memcpy(blockPointer, newBlock, BLOCK_SIZE);
+                return i; // Return the logical block number
+            }
+        }
+    } else { // RAID 1
+        char *bitmap = get_bitmap((void*)disk, superblock->i_bitmap_ptr);
+        for (int i = 0; i < superblock->num_data_blocks; i++) {
+            if (!(bitmap[i / 8] & (1 << (i % 8)))) {
+                bitmap[i / 8] |= (1 << (i % 8));
+                return i;
+            }
+        }
+    }
 
+    return -ENOSPC; // No free blocks
+}
 
 
 static int wfs_getattr(const char *path, struct stat *stbuf) {
