@@ -165,19 +165,19 @@ static int wfs_getattr(const char *path, struct stat *stbuf) {
 
 
 // Parse the path into parent directory path and new directory name
-static void parse_path(const char *path, char *parent_path, char *new_name, size_t size) {
-    strncpy(parent_path, path, size - 1);
-    parent_path[size - 1] = '\0';
-    char *slash = strrchr(parent_path, '/');
+static void parse_path(const char *path, char *dir_path, char *new, size_t size) {
+    strncpy(dir_path, path, size - 1);
+    dir_path[size - 1] = '\0';
+    //char *slash = strrchr(dir_path, '/');
 
-    if (!slash || slash == parent_path) {
-        strncpy(new_name, path + 1, MAX_NAME - 1); // Root directory
-        new_name[MAX_NAME - 1] = '\0';
-        strcpy(parent_path, "/");
+    if (!strrchr(dir_path, '/') || strrchr(dir_path, '/') == dir_path) {
+        strncpy(new, path + 1, MAX_NAME - 1); // Root directory
+        new[MAX_NAME - 1] = '\0';
+        strcpy(dir_path, "/");
     } else {
-        strncpy(new_name, slash + 1, MAX_NAME - 1);
-        new_name[MAX_NAME - 1] = '\0';
-        *slash = '\0';
+        strncpy(new, strrchr(dir_path, '/') + 1, MAX_NAME - 1);
+        new[MAX_NAME - 1] = '\0';
+        *strrchr(dir_path, '/') = '\0';
     }
 }
 
