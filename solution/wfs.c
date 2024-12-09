@@ -168,8 +168,6 @@ static int wfs_getattr(const char *path, struct stat *stbuf) {
 static void parse_path(const char *path, char *dir_path, char *new, size_t size) {
     strncpy(dir_path, path, size - 1);
     dir_path[size - 1] = '\0';
-    //char *slash = strrchr(dir_path, '/');
-
     if (!strrchr(dir_path, '/') || strrchr(dir_path, '/') == dir_path) {
         strncpy(new, path + 1, MAX_NAME - 1); // Root directory
         new[MAX_NAME - 1] = '\0';
@@ -185,9 +183,9 @@ static void parse_path(const char *path, char *dir_path, char *new, size_t size)
 static void initialize_new_inode(struct wfs_inode *inode, int inode_index, mode_t mode) {
     memset(inode, 0, BLOCK_SIZE);
     inode->num = inode_index;
-    inode->mode = S_IFDIR | mode; // Set directory mode
-    inode->nlinks = 2;           // "." and parent link
-    inode->size = 0;             // Empty directory initially
+    inode->mode = S_IFDIR | mode;
+    inode->nlinks = 2;
+    inode->size = 0;
     inode->atim = inode->mtim = inode->ctim = time(NULL);
     inode->uid = getuid();
     inode->gid = getgid();
@@ -200,6 +198,12 @@ static void mirror_inode_raid0(int inode_index, mode_t mode) {
         struct wfs_inode *inode = (struct wfs_inode *)(inode_table + inode_index * BLOCK_SIZE);
         initialize_new_inode(inode, inode_index, mode);
     }
+}
+
+static void mirror_inode_raidnormal(int inode_index, mode_t mode) {
+    char *inode_table = (char *)disks[i] + superblock->i_blocks_ptr;
+    struct wfs_inode *new_inode = (struct wfs_inode *)(inode_table + new_inode_index * BLOCK_SIZE);
+    initialize_new_inode(new_inode, new_inode_index, mode);
 }
 
 // Add a new directory entry to the parent directory
@@ -272,8 +276,9 @@ static int wfs_mkdir_helper(const char *path, mode_t mode, char *disk) {
     if (superblock->raid_mode == 0) {
         mirror_inode_raid0(new_inode_index, mode);
     } else {
-        char *inode_table = disk + superblock->i_blocks_ptr;
-        struct wfs_inode *new_inode = (struct wfs_inode *)(inode_table + new_inode_index * BLOCK_SIZE);
+        // mirror_inode_raidnormal(new_inode_index, mode);
+        // char *inode_table = disk + superblock->i_blocks_ptr;
+        // struct wfs_inode *new_inode = (struct wfs_inode *)(inode_table + new_inode_index * BLOCK_SIZE);
         initialize_new_inode(new_inode, new_inode_index, mode);
     }
 
