@@ -398,18 +398,13 @@ static void fill_directory_entries(void *buf, fuse_fill_dir_t filler, char *disk
     }
 }
 
-// Main readdir implementation
 static int wfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
-    printf("readdir called for path: %s\n", path);
-    
+    printf("%s must be read\n", path);
     filler(buf, ".", NULL, 0);  // Current directory
     filler(buf, "..", NULL, 0); // Parent directory
-
     struct wfs_inode *inode = get_inode(path, (char*)disks[0]);
-    if (!inode || !(inode->mode & S_IFDIR)) {
+    if (!inode || !(inode->mode & S_IFDIR))
         return -ENOENT;
-    }
-
     for (int i = 0; i < D_BLOCK; i++) {
         if (inode->blocks[i] == 0) {
             break;
@@ -417,13 +412,12 @@ static int wfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_
 
         fill_directory_entries(buf, filler, (char *)disks[0], inode->blocks[i]);
     }
-
     return SUCCEED;
 }
 
 // Helper to fetch a data block for reading
 static void *get_data_block(struct wfs_inode *inode, size_t block_offset) {
-    if (block_offset < D_BLOCK) { // Handle direct blocks
+    if (block_offset < D_BLOCK) {
         if (inode->blocks[block_offset] == 0) {
             return NULL; // No more data
         }
