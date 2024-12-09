@@ -541,6 +541,7 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
     while (bytes < size) {
         int dIndex = (superblock->raid_mode == 0) ? bOff % diskNum : 0;
         int blockNum = (superblock->raid_mode == 0) ? bOff / diskNum : bOff;
+        uint32_t *indirect_block;
 
         if (bOff < D_BLOCK) {
             if (inode->blocks[bOff] == 0) {
