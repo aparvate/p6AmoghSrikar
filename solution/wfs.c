@@ -43,12 +43,12 @@ struct wfs_inode *get_inode(const char *path, char* disk) {
             off_t blockStart = currInode->blocks[i];
             if (blockStart == 0) {
                 break;
-            } // No more blocks
+            }
             else{
                 struct wfs_dentry *dentry = (struct wfs_dentry *)((char *)disks[0] + blockStart);
                 for (int j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
-                    if (strcmp(dentry[j]->name, token) == 0) {
-                        currInode = dentry[j]->num;
+                    if (strcmp(dentry[j].name, token) == 0) {
+                        currInode = dentry[j].num;
                         found = true;
                         break;
                     }
