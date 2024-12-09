@@ -24,7 +24,7 @@ int diskNum;
 size_t diskSize;
 static int *fileDescs;
 
-struct wfs_dentry get_dentry(void* disk, off_t block) {
+struct wfs_dentry* get_dentry(void* disk, off_t block) {
     return (struct wfs_dentry *)((char *)disk + block);
 }
 
