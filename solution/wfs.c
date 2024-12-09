@@ -24,6 +24,10 @@ int diskNum;
 size_t diskSize;
 static int *fileDescs;
 
+struct wfs_dentry get_dentry(void* disks, off_t blocks) {
+    return (struct wfs_dentry *)((char *)disks[0] + inode->blocks[i]);
+}
+
 struct wfs_inode *get_inode(const char *path, char* disk) {
     // Start at the root inode
     char *inode_table = disk + superblock->i_blocks_ptr;
@@ -42,12 +46,13 @@ struct wfs_inode *get_inode(const char *path, char* disk) {
         for (int i = 0; i < D_BLOCK; i++) {
             if (inode->blocks[i] == 0) break; // No more blocks
 
-            struct wfs_dentry *dir_entries = (struct wfs_dentry *)((char *)disks[0] + inode->blocks[i]);
+            struct wfs_dentry *dentry = get_dentry(disks[0], inode->blocks[i]);
+            //(struct wfs_dentry *)((char *)disks[0] + inode->blocks[i]);
             for (int j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
-                if (strcmp(dir_entries[j].name, token) == 0) {
+                if (strcmp(dentry[j].name, token) == 0) {
 		   
 
-                    inode = (struct wfs_inode *)(inode_table + (dir_entries[j].num * BLOCK_SIZE));
+                    inode = (struct wfs_inode *)(inode_table + (dentry[j].num * BLOCK_SIZE));
                     found = 1;
                     break;
                 }
@@ -268,7 +273,9 @@ static int wfs_mkdir_helper(const char *path, mode_t mode, char *disk) {
 	    }
         }
 
-        struct wfs_dentry *dir_entries = (struct wfs_dentry *)(disk + parent_inode->blocks[i]);
+        struct wfs_dentry *dir_entries = get_dentry((void*) disk, parent_inode->blocks[i]);
+        //(struct wfs_dentry *)(disk + parent_inode->blocks[i]);
+        
         // Try to find an empty entry in the current block
         for (int j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
             if (dir_entries[j].num == 0) { // Empty entry
