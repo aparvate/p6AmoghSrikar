@@ -360,7 +360,7 @@ static int wfs_mknod_helper(const char *path, mode_t mode, char *disk) {
 
     // Initialize or mirror inode based on RAID mode
     if (superblock->raid_mode == 0) {
-        mirror_file_inode_raid0(new_inode_index, mode, true);
+        mirror_inode_raid0(new_inode_index, mode, true);
     } else {
         char *inode_table = disk + superblock->i_blocks_ptr;
         struct wfs_inode *new_inode = (struct wfs_inode *)(inode_table + new_inode_index * BLOCK_SIZE);
