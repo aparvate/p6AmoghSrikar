@@ -48,7 +48,7 @@ struct wfs_inode *get_inode(const char *path, char* disk) {
                 struct wfs_dentry *dentry = (struct wfs_dentry *)((char *)disks[0] + blockStart);
                 for (int j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
                     if (strcmp(dentry[j].name, token) == 0) {
-                        currInode = dentry[j].num;
+                        currInode = (struct wfs_inode *)(inode_table + (dentry[j].num * BLOCK_SIZE));
                         found = true;
                         break;
                     }
