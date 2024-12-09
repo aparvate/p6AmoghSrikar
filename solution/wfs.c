@@ -527,60 +527,71 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
     struct wfs_inode *inode = get_inode(path, (char *)disks[0]);
     if (!inode) {
         return -ENOENT; // File not found
+    }
     if ((inode->mode & S_IFDIR)) {
         printf("Cannot read\n");
         return -EISDIR; // Not a directory
     }
 
-    size_t bSpace;
-    size_t bytesLeft;
-    size_t bytes = 0;
-    size_t bOff = offset / BLOCK_SIZE;
-    size_t bSOff = offset % BLOCK_SIZE;
+    size_t bytes_written = 0;
+    size_t block_offset = offset / BLOCK_SIZE;
+    size_t block_start_offset = offset % BLOCK_SIZE;
+    size_t block_available_space;
+    size_t bytes_to_write;
 
-    while (bytes < size) {
-        int dIndex = (superblock->raid_mode == 0) ? bOff % diskNum : 0;
-        int blockNum = (superblock->raid_mode == 0) ? bOff / diskNum : bOff;
-        uint32_t *indirect_block;
+    while (bytes_written < size) {
+        int disk_index = (superblock->raid_mode == 0) ? block_offset % diskNum : 0;
+        int logical_block_num = (superblock->raid_mode == 0) ? block_offset / diskNum : block_offset;
 
-        if (bOff < D_BLOCK) {
-            if (inode->blocks[bOff] == 0) {
-                if (allocate_and_map_direct_block(inode, bOff, dIndex, blockNum) < 0) {
+        // Handle direct blocks
+        if (block_offset < D_BLOCK) {
+            if (inode->blocks[block_offset] == 0) {
+                if (allocate_and_map_direct_block(inode, block_offset, disk_index, logical_block_num) < 0) {
                     return -ENOSPC;
                 }
             }
+
+            block_available_space = BLOCK_SIZE - block_start_offset;
+            bytes_to_write = (size - bytes_written < block_available_space) ? size - bytes_written : block_available_space;
+
+            write_to_block(buf, bytes_written, bytes_to_write, block_start_offset, inode->blocks[logical_block_num], disk_index);
         }
+        // Handle indirect blocks
         else {
-            if (inode->blocks[IND_BLOCK] == 0) {
-                if (allocate_and_map_indirect_block(inode, dIndex) < 0) {
-                    return -ENOSPC;
-                }
-            }
-            uint32_t *indirect_block = (uint32_t *)((char *)disks[dIndex] + inode->blocks[IND_BLOCK]);
-            if (indirect_block[(bOff - D_BLOCK)] == 0) {
-                if (allocate_and_map_direct_block(inode, (bOff - D_BLOCK), dIndex, blockNum) < 0) {
-                    return -ENOSPC;
-                }
-            }
-        }
-        bSpace = BLOCK_SIZE - bSOff;
-        bytesLeft = (size - bytes < bSpace) ? size - bytes : bSpace;
-        if (bOff < D_BLOCK) 
-            write_to_block(buf, bytes, bytesLeft, bSOff, inode->blocks[blockNum], dIndex);
-        else
-            write_to_block(buf, bytes, bytesLeft, bSOff, indirect_block[indirect_offset], dIndex);
+            size_t indirect_offset = block_offset - D_BLOCK;
 
-        bytes += bytesLeft;
-        bOff++;
-        bSOff = 0;
+            if (inode->blocks[IND_BLOCK] == 0) {
+                if (allocate_and_map_indirect_block(inode, disk_index) < 0) {
+                    return -ENOSPC;
+                }
+            }
+
+            uint32_t *indirect_block = (uint32_t *)((char *)disks[disk_index] + inode->blocks[IND_BLOCK]);
+            if (indirect_block[indirect_offset] == 0) {
+                if (allocate_and_map_direct_block(inode, indirect_offset, disk_index, logical_block_num) < 0) {
+                    return -ENOSPC;
+                }
+            }
+
+            block_available_space = BLOCK_SIZE - block_start_offset;
+            bytes_to_write = (size - bytes_written < block_available_space) ? size - bytes_written : block_available_space;
+
+            write_to_block(buf, bytes_written, bytes_to_write, block_start_offset, indirect_block[indirect_offset], disk_index);
+        }
+
+        bytes_written += bytes_to_write;
+        block_offset++;
+        block_start_offset = 0; // Reset for subsequent blocks
     }
+
+    // Update inode metadata on all disks
     for (int i = 0; i < diskNum; i++) {
         struct wfs_inode *mirror_inode = (struct wfs_inode *)((char *)disks[i] + superblock->i_blocks_ptr + inode->num * BLOCK_SIZE);
         mirror_inode->size = (offset + size > mirror_inode->size) ? offset + size : mirror_inode->size;
         mirror_inode->mtim = time(NULL);
     }
 
-    return bytes;
+    return bytes_written;
 }
 
 
