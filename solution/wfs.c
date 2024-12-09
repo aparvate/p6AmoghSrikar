@@ -433,7 +433,8 @@ static int wfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_
     }
 
     // Ensure the inode is a directory
-    if (!S_ISDIR(inode->mode)) {
+    if (!(inode->mode & S_IFDIR)) {
+        printf("Not a directory\n");
         return -ENOTDIR; // Not a directory
     }
 
