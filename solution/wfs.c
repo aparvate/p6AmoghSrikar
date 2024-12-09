@@ -279,7 +279,7 @@ static int wfs_mkdir_helper(const char *path, mode_t mode, char *disk) {
         mirror_inode_raidnormal(new_inode_index, mode);
         // char *inode_table = disk + superblock->i_blocks_ptr;
         // struct wfs_inode *new_inode = (struct wfs_inode *)(inode_table + new_inode_index * BLOCK_SIZE);
-        initialize_new_inode(new_inode, new_inode_index, mode);
+        // initialize_new_inode(new_inode, new_inode_index, mode);
     }
 
     // Add the directory entry to the parent
