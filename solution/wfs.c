@@ -410,42 +410,62 @@ static int wfs_mknod(const char *path, mode_t mode, dev_t rdev) {
 }
 
 
+// Helper to validate and retrieve the inode for a directory
+static struct wfs_inode *validate_directory_inode(const char *path, char *disk) {
+    printf("Validating directory inode for path: %s\n", path);
+
+    struct wfs_inode *inode = get_inode(path, disk);
+    if (!inode) {
+        printf("Directory not found for path: %s\n", path);
+        return NULL;
+    }
+
+    if (!(inode->mode & S_IFDIR)) {
+        printf("Path is not a directory: %s\n", path);
+        return NULL;
+    }
+
+    return inode;
+}
+
+// Helper to read entries from a block and fill them into the buffer
+static void fill_directory_entries(void *buf, fuse_fill_dir_t filler, char *disk, uint32_t block) {
+    struct wfs_dentry *dir_entries = get_dentry(disk, block);
+
+    for (int j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
+        if (dir_entries[j].num != 0) { // Valid entry
+            filler(buf, dir_entries[j].name, NULL, 0);
+            printf("Adding entry: %s\n", dir_entries[j].name);
+        }
+    }
+}
+
+// Main readdir implementation
 static int wfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
     printf("readdir called for path: %s\n", path);
 
-    // Find the inode for the directory
-    struct wfs_inode *inode = get_inode(path, (char *)disks[0]);
+    // Validate and retrieve the inode
+    struct wfs_inode *inode = validate_directory_inode(path, (char *)disks[0]);
     if (!inode) {
-        return -ENOENT; // Directory not found
+        return -ENOENT; // Directory not found or invalid
     }
 
-    // Ensure the inode is a directory
-    if (!(inode->mode & S_IFDIR)) {
-        printf("Not a directory\n");
-        return -ENOTDIR; // Not a directory
-    }
-
-    // Add "." and ".." entries
-    filler(buf, ".", NULL, 0); // Current directory
+    // Fill standard entries for "." and ".."
+    filler(buf, ".", NULL, 0);  // Current directory
     filler(buf, "..", NULL, 0); // Parent directory
 
-    // Iterate through the blocks of the directory inode
+    // Iterate through directory blocks and fill entries
     for (int i = 0; i < D_BLOCK; i++) {
-        if (inode->blocks[i] == 0) break; // No more blocks
-
-        // Access directory entries stored in the block
-        struct wfs_dentry *dir_entries = get_dentry(disks[0], inode->blocks[i]);
-        //(struct wfs_dentry *)((char *)disks[0] + inode->blocks[i]);
-        for (int j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
-            if (dir_entries[j].num != 0) { // Valid entry
-                filler(buf, dir_entries[j].name, NULL, 0); // Add entry to the buffer
-                printf("Adding entry: %s\n", dir_entries[j].name);
-            }
+        if (inode->blocks[i] == 0) {
+            break; // No more blocks
         }
+
+        fill_directory_entries(buf, filler, (char *)disks[0], inode->blocks[i]);
     }
 
-    return SUCCEED; // SUCCEED
+    return SUCCEED; // Directory read successfully
 }
+
 
 static int wfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
     // Find the inode for the file
