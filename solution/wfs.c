@@ -256,7 +256,7 @@ static int add_file_entry(struct wfs_inode *parent_inode, const char *parent_pat
             int blockIndex = allocate_block(disk);
             if (blockIndex < 0) 
                 return -ENOSPC;
-            parent_inode->blocks[i] = superblock->d_blocks_ptr + block_index * BLOCK_SIZE;
+            parent_inode->blocks[i] = superblock->d_blocks_ptr + blockIndex * BLOCK_SIZE;
         }
 
         struct wfs_dentry *dentry = get_dentry((void *)disk, parent_inode->blocks[i]);
