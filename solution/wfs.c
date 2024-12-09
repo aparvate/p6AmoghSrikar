@@ -47,7 +47,6 @@ struct wfs_inode *get_inode(const char *path, char* disk) {
             if (inode->blocks[i] == 0) break; // No more blocks
 
             struct wfs_dentry *dentry = get_dentry(disks[0], inode->blocks[i]);
-            //(struct wfs_dentry *)((char *)disks[0] + inode->blocks[i]);
             for (int j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
                 if (strcmp(dentry[j].name, token) == 0) {
 		   
@@ -274,7 +273,6 @@ static int wfs_mkdir_helper(const char *path, mode_t mode, char *disk) {
         }
 
         struct wfs_dentry *dir_entries = get_dentry((void*) disk, parent_inode->blocks[i]);
-        //(struct wfs_dentry *)(disk + parent_inode->blocks[i]);
         
         // Try to find an empty entry in the current block
         for (int j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
@@ -377,7 +375,8 @@ static int wfs_mknod_helper(const char *path, mode_t mode, char *disk) {
             }
             parent_inode->blocks[i] = superblock->d_blocks_ptr + block_index * BLOCK_SIZE;
         }
-        struct wfs_dentry *dir_entries = (struct wfs_dentry *)(disk + parent_inode->blocks[i]);
+        struct wfs_dentry *dir_entries = get_dentry((void*) disk, parent_inode->blocks[i])
+        //(struct wfs_dentry *)(disk + parent_inode->blocks[i]);
         for (int j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
             if (dir_entries[j].num == 0) {
                 strncpy(dir_entries[j].name, new_name, MAX_NAME);
@@ -447,7 +446,8 @@ static int wfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_
         if (inode->blocks[i] == 0) break; // No more blocks
 
         // Access directory entries stored in the block
-        struct wfs_dentry *dir_entries = (struct wfs_dentry *)((char *)disks[0] + inode->blocks[i]);
+        struct wfs_dentry *dir_entries = get_dentry(disks[0], inode->blocks[i])
+        //(struct wfs_dentry *)((char *)disks[0] + inode->blocks[i]);
         for (int j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
             if (dir_entries[j].num != 0) { // Valid entry
                 filler(buf, dir_entries[j].name, NULL, 0); // Add entry to the buffer
