@@ -26,7 +26,7 @@ static int *fileDescs;
 
 struct wfs_inode *get_inode(const char *path, char* disk) {
     // Start at the root inode
-    char *inode_table = disk + sb->i_blocks_ptr;
+    char *inode_table = disk + superblock->i_blocks_ptr;
     struct wfs_inode *inode = (struct wfs_inode *)(inode_table);
 
     if (strcmp(path, "/") == 0) {
@@ -42,7 +42,7 @@ struct wfs_inode *get_inode(const char *path, char* disk) {
         for (int i = 0; i < D_BLOCK; i++) {
             if (inode->blocks[i] == 0) break; // No more blocks
 
-            struct wfs_dentry *dir_entries = (struct wfs_dentry *)((char *)disk_maps[0] + inode->blocks[i]);
+            struct wfs_dentry *dir_entries = (struct wfs_dentry *)((char *)disks[0] + inode->blocks[i]);
             for (int j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
                 if (strcmp(dir_entries[j].name, token) == 0) {
 		   
