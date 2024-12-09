@@ -527,264 +527,71 @@ static int wfs_write(const char *path, const char *buf, size_t size, off_t offse
     struct wfs_inode *inode = get_inode(path, (char *)disks[0]);
     if (!inode) {
         return -ENOENT; // File not found
-    }
     if ((inode->mode & S_IFDIR)) {
         printf("Cannot read\n");
         return -EISDIR; // Not a directory
     }
 
-    size_t bytes_written = 0;
-    size_t block_offset = offset / BLOCK_SIZE;
-    size_t block_start_offset = offset % BLOCK_SIZE;
-    size_t block_available_space;
-    size_t bytes_to_write;
+    size_t bSpace;
+    size_t bytesLeft;
+    size_t bytes = 0;
+    size_t bOff = offset / BLOCK_SIZE;
+    size_t bSOff = offset % BLOCK_SIZE;
 
-    while (bytes_written < size) {
-        int disk_index = (superblock->raid_mode == 0) ? block_offset % diskNum : 0;
-        int logical_block_num = (superblock->raid_mode == 0) ? block_offset / diskNum : block_offset;
+    while (bytes < size) {
+        int dIndex = (superblock->raid_mode == 0) ? bOff % diskNum : 0;
+        int blockNum = (superblock->raid_mode == 0) ? bOff / diskNum : bOff;
 
-        // Handle direct blocks
-        if (block_offset < D_BLOCK) {
-            if (inode->blocks[block_offset] == 0) {
-                if (allocate_and_map_direct_block(inode, block_offset, disk_index, logical_block_num) < 0) {
+        if (bOff < D_BLOCK) {
+            if (inode->blocks[bOff] == 0) {
+                if (allocate_and_map_direct_block(inode, bOff, dIndex, blockNum) < 0) {
                     return -ENOSPC;
                 }
             }
-
-            block_available_space = BLOCK_SIZE - block_start_offset;
-            bytes_to_write = (size - bytes_written < block_available_space) ? size - bytes_written : block_available_space;
-
-            write_to_block(buf, bytes_written, bytes_to_write, block_start_offset, inode->blocks[logical_block_num], disk_index);
         }
-        // Handle indirect blocks
         else {
-            size_t indirect_offset = block_offset - D_BLOCK;
-
             if (inode->blocks[IND_BLOCK] == 0) {
-                if (allocate_and_map_indirect_block(inode, disk_index) < 0) {
+                if (allocate_and_map_indirect_block(inode, dIndex) < 0) {
                     return -ENOSPC;
                 }
             }
-
-            uint32_t *indirect_block = (uint32_t *)((char *)disks[disk_index] + inode->blocks[IND_BLOCK]);
-            if (indirect_block[indirect_offset] == 0) {
-                if (allocate_and_map_direct_block(inode, indirect_offset, disk_index, logical_block_num) < 0) {
+            uint32_t *indirect_block = (uint32_t *)((char *)disks[dIndex] + inode->blocks[IND_BLOCK]);
+            if (indirect_block[(bOff - D_BLOCK)] == 0) {
+                if (allocate_and_map_direct_block(inode, (bOff - D_BLOCK), dIndex, blockNum) < 0) {
                     return -ENOSPC;
                 }
             }
-
-            block_available_space = BLOCK_SIZE - block_start_offset;
-            bytes_to_write = (size - bytes_written < block_available_space) ? size - bytes_written : block_available_space;
-
-            write_to_block(buf, bytes_written, bytes_to_write, block_start_offset, indirect_block[indirect_offset], disk_index);
         }
+        bSpace = BLOCK_SIZE - bSOff;
+        bytesLeft = (size - bytes < bSpace) ? size - bytes : bSpace;
+        if (bOff < D_BLOCK) 
+            write_to_block(buf, bytes, bytesLeft, bSOff, inode->blocks[blockNum], dIndex);
+        else
+            write_to_block(buf, bytes, bytesLeft, bSOff, indirect_block[indirect_offset], dIndex);
 
-        bytes_written += bytes_to_write;
-        block_offset++;
-        block_start_offset = 0; // Reset for subsequent blocks
+        bytes += bytesLeft;
+        bOff++;
+        bSOff = 0;
     }
-
-    // Update inode metadata on all disks
     for (int i = 0; i < diskNum; i++) {
         struct wfs_inode *mirror_inode = (struct wfs_inode *)((char *)disks[i] + superblock->i_blocks_ptr + inode->num * BLOCK_SIZE);
         mirror_inode->size = (offset + size > mirror_inode->size) ? offset + size : mirror_inode->size;
         mirror_inode->mtim = time(NULL);
     }
 
-    return bytes_written;
+    return bytes;
 }
 
 
 static int wfs_unlink(const char *path) {
     printf("unlink called for path: %s\n", path);
-
-    // // Step 1: Extract parent directory and filename
-    // char parent_path[1024], file_name[MAX_NAME];
-    // strncpy(parent_path, path, sizeof(parent_path));
-    // char *slash = strrchr(parent_path, '/');
-    // if (!slash || slash == parent_path) {
-    //     strncpy(file_name, path + 1, sizeof(file_name));
-    //     strcpy(parent_path, "/");
-    // } else {
-    //     strncpy(file_name, slash + 1, sizeof(file_name));
-    //     *slash = '\0';
-    // }
-
-    // // Step 2: Get the parent directory's inode
-    // struct wfs_inode *parent_inode = get_inode(parent_path, (char *)disks[0]);
-    // if (!parent_inode || !S_ISDIR(parent_inode->mode)) {
-    //     return -ENOENT; // Parent directory not found
-    // }
-
-    // // Step 3: Locate the file in the parent directory
-    // struct wfs_dentry *entry = NULL;
-    // for (int i = 0; i < D_BLOCK; i++) {
-    //     if (parent_inode->blocks[i] == 0) break;
-
-    //     struct wfs_dentry *dir_entries = (struct wfs_dentry *)((char *)disks[0] + parent_inode->blocks[i]);
-    //     for (int j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
-    //         if (strcmp(dir_entries[j].name, file_name) == 0) {
-    //             entry = &dir_entries[j];
-    //             break;
-    //         }
-    //     }
-    //     if (entry) break;
-    // }
-
-    // if (!entry) return -ENOENT; // File not found
-
-    // int file_inode_num = entry->num;
-
-    // // Step 4: Free data blocks
-    // for (int d = 0; d < diskNum; d++) {
-    //     struct wfs_inode *file_inode = (struct wfs_inode *)((char *)disks[d] + superblock->i_blocks_ptr + file_inode_num * BLOCK_SIZE);
-
-    //     for (int i = 0; i < D_BLOCK; i++) {
-    //         if (file_inode->blocks[i] == 0) continue;
-
-    //         int block_index = (file_inode->blocks[i] - superblock->d_blocks_ptr) / BLOCK_SIZE;
-    //         char *data_bitmap = (char *)disks[d] + superblock->d_bitmap_ptr;
-    //         data_bitmap[block_index / 8] &= ~(1 << (block_index % 8)); // Free block
-    //         file_inode->blocks[i] = 0; // Clear block reference
-    //     }
-
-    //     // Free indirect blocks if any
-    //     if (file_inode->blocks[IND_BLOCK] != 0) {
-    //         uint32_t *indirect_blocks = (uint32_t *)((char *)disks[d] + file_inode->blocks[IND_BLOCK]);
-    //         for (int i = 0; i < BLOCK_SIZE / sizeof(uint32_t); i++) {
-    //             if (indirect_blocks[i] == 0) break;
-
-    //             int block_index = (indirect_blocks[i] - superblock->d_blocks_ptr) / BLOCK_SIZE;
-    //             char *data_bitmap = (char *)disks[d] + superblock->d_bitmap_ptr;
-    //             data_bitmap[block_index / 8] &= ~(1 << (block_index % 8)); // Free block
-    //         }
-
-    //         // Free the indirect block itself
-    //         int indirect_block_index = (file_inode->blocks[IND_BLOCK] - superblock->d_blocks_ptr) / BLOCK_SIZE;
-    //         char *data_bitmap = (char *)disks[d] + superblock->d_bitmap_ptr;
-    //         data_bitmap[indirect_block_index / 8] &= ~(1 << (indirect_block_index % 8));
-    //         file_inode->blocks[IND_BLOCK] = 0;
-    //     }
-
-    //     // Free inode
-    //     char *inode_bitmap = (char *)disks[d] + superblock->i_bitmap_ptr;
-    //     inode_bitmap[file_inode_num / 8] &= ~(1 << (file_inode_num % 8));
-    //     memset(file_inode, 0, BLOCK_SIZE); // Clear inode
-    // }
-
-    // // Step 5: Remove the directory entry
-    // for (int d = 0; d < diskNum; d++) {
-    //     struct wfs_dentry *dir_entries = (struct wfs_dentry *)((char *)disks[d] + parent_inode->blocks[0]);
-    //     for (int j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
-    //         if (strcmp(dir_entries[j].name, file_name) == 0) {
-    //             memset(&dir_entries[j], 0, sizeof(struct wfs_dentry)); // Clear directory entry
-    //             break;
-    //         }
-    //     }
-    // }
-
-    // // Update parent directory metadata across all disks
-    // for (int d = 0; d < diskNum; d++) {
-    //     struct wfs_inode *mirror_parent_inode = (struct wfs_inode *)((char *)disks[d] + superblock->i_blocks_ptr + parent_inode->num * BLOCK_SIZE);
-    //     mirror_parent_inode->size -= sizeof(struct wfs_dentry);
-    //     mirror_parent_inode->mtim = time(NULL);
-    // }
-
+    //TODO
     return SUCCEED; // SUCCEED
 }
 
 static int wfs_rmdir(const char *path) {
     printf("rmdir called for path: %s\n", path);
-
-    // // Step 1: Extract parent directory and target directory name
-    // char parent_path[1024], dir_name[MAX_NAME];
-    // strncpy(parent_path, path, sizeof(parent_path));
-    // char *slash = strrchr(parent_path, '/');
-    // if (!slash || slash == parent_path) {
-    //     strncpy(dir_name, path + 1, sizeof(dir_name));
-    //     strcpy(parent_path, "/");
-    // } else {
-    //     strncpy(dir_name, slash + 1, sizeof(dir_name));
-    //     *slash = '\0';
-    // }
-
-    // // Step 2: Get the parent directory's inode
-    // struct wfs_inode *parent_inode = get_inode(parent_path, (char *)disks[0]);
-    // if (!parent_inode || !S_ISDIR(parent_inode->mode)) {
-    //     return -ENOENT; // Parent directory not found
-    // }
-
-    // // Step 3: Locate the target directory in the parent directory
-    // struct wfs_dentry *entry = NULL;
-    // for (int i = 0; i < D_BLOCK; i++) {
-    //     if (parent_inode->blocks[i] == 0) break;
-
-    //     struct wfs_dentry *dir_entries = (struct wfs_dentry *)((char *)disks[0] + parent_inode->blocks[i]);
-    //     for (int j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
-    //         if (strcmp(dir_entries[j].name, dir_name) == 0) {
-    //             entry = &dir_entries[j];
-    //             break;
-    //         }
-    //     }
-    //     if (entry) break;
-    // }
-
-    // if (!entry) return -ENOENT; // Directory not found
-
-    // int dir_inode_num = entry->num;
-    // struct wfs_inode *dir_inode = (struct wfs_inode *)((char *)disks[0] + superblock->i_blocks_ptr + dir_inode_num * BLOCK_SIZE);
-
-    // // Step 4: Check that the directory is empty
-    // for (int i = 0; i < D_BLOCK; i++) {
-    //     if (dir_inode->blocks[i] == 0) continue;
-
-    //     struct wfs_dentry *dir_entries = (struct wfs_dentry *)((char *)disks[0] + dir_inode->blocks[i]);
-    //     for (int j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
-    //         if (dir_entries[j].num != 0 && strcmp(dir_entries[j].name, ".") != 0 && strcmp(dir_entries[j].name, "..") != 0) {
-    //             return -ENOTEMPTY; // Directory is not empty
-    //         }
-    //     }
-    // }
-
-    // // Step 5: Free directory blocks and inode
-    // for (int d = 0; d < diskNum; d++) {
-    //     struct wfs_inode *mirror_dir_inode = (struct wfs_inode *)((char *)disks[d] + superblock->i_blocks_ptr + dir_inode_num * BLOCK_SIZE);
-
-    //     for (int i = 0; i < D_BLOCK; i++) {
-    //         if (mirror_dir_inode->blocks[i] == 0) continue;
-
-    //         int block_index = (mirror_dir_inode->blocks[i] - superblock->d_blocks_ptr) / BLOCK_SIZE;
-    //         if (superblock->raid_mode == 0 && block_index % diskNum != d) continue; // Skip non-relevant disks for RAID 0
-
-    //         char *data_bitmap = (char *)disks[d] + superblock->d_bitmap_ptr;
-    //         data_bitmap[block_index / 8] &= ~(1 << (block_index % 8));
-    //         mirror_dir_inode->blocks[i] = 0; // Clear block reference
-    //     }
-
-    //     // Free inode
-    //     char *inode_bitmap = (char *)disks[d] + superblock->i_bitmap_ptr;
-    //     inode_bitmap[dir_inode_num / 8] &= ~(1 << (dir_inode_num % 8));
-    //     memset(mirror_dir_inode, 0, BLOCK_SIZE);
-    // }
-
-    // // Step 6: Remove the directory entry from the parent directory
-    // for (int d = 0; d < diskNum; d++) {
-    //     struct wfs_dentry *dir_entries = (struct wfs_dentry *)((char *)disks[d] + parent_inode->blocks[0]);
-    //     for (int j = 0; j < BLOCK_SIZE / sizeof(struct wfs_dentry); j++) {
-    //         if (strcmp(dir_entries[j].name, dir_name) == 0) {
-    //             memset(&dir_entries[j], 0, sizeof(struct wfs_dentry)); // Clear directory entry
-    //             break;
-    //         }
-    //     }
-    // }
-
-    // // Step 7: Update parent directory metadata across all disks
-    // for (int d = 0; d < diskNum; d++) {
-    //     struct wfs_inode *mirror_parent_inode = (struct wfs_inode *)((char *)disks[d] + superblock->i_blocks_ptr + parent_inode->num * BLOCK_SIZE);
-    //     mirror_parent_inode->size -= sizeof(struct wfs_dentry);
-    //     mirror_parent_inode->mtim = time(NULL);
-    // }
-
+    //TODO
     return SUCCEED; // SUCCEED
 }
 
